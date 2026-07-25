@@ -45,6 +45,21 @@ def require_replacement(record: dict[str, Any]) -> tuple[str, str]:
     return source, replacement
 
 
+def validate_disclosure_redaction(record: dict[str, Any]) -> None:
+    """Require an explicit human decision before masking a whole disclosure sentence."""
+    require_replacement(record)
+    if record.get("redaction_type") != "문장 비공개":
+        return
+    if not isinstance(record.get("location"), str) or not record["location"].strip():
+        raise ValueError(f"{record.get('id', 'unknown')} 문장 비공개에는 location이 필요합니다.")
+    if not isinstance(record.get("reason"), str) or not record["reason"].strip():
+        raise ValueError(f"{record.get('id', 'unknown')} 문장 비공개에는 reason이 필요합니다.")
+    if record.get("human_decision") not in {"담당자 승인", "정보공개 담당 확인", "법무 확인"}:
+        raise ValueError(f"{record.get('id', 'unknown')} 문장 비공개에는 실무자 판단 상태가 필요합니다.")
+    if int(record.get("min_matches", 1)) != 1 or int(record.get("max_matches", 1)) != 1:
+        raise ValueError(f"{record.get('id', 'unknown')} 문장 비공개는 정확히 한 곳만 처리해야 합니다.")
+
+
 def apply_records(
     entries: dict[str, bytes], section_files: list[str], records: list[dict[str, Any]], label: str
 ) -> tuple[dict[str, bytes], list[dict[str, Any]]]:
@@ -64,6 +79,11 @@ def apply_records(
         if total < required:
             raise ValueError(
                 f"{label} {record.get('id', 'unknown')}의 치환 횟수 {total}가 최소값 {required}보다 작습니다."
+            )
+        maximum = record.get("max_matches")
+        if maximum is not None and total > int(maximum):
+            raise ValueError(
+                f"{label} {record.get('id', 'unknown')}의 치환 횟수 {total}가 최대값 {maximum}보다 큽니다."
             )
         audit.append(
             {
@@ -140,6 +160,8 @@ def main() -> int:
             raise ValueError(f"정보공개 전용 일반 수정은 허용하지 않습니다. redactions로 이동하세요: {invalid_edits}")
         if invalid_redactions:
             raise ValueError(f"비실명 처리는 정보공개 청구용 범위만 허용합니다: {invalid_redactions}")
+        for record in selected(redactions, DISCLOSURE_REDACTION_SCOPES):
+            validate_disclosure_redaction(record)
 
         approval_records = selected(edits, REAL_SCOPES)
         disclosure_edits = approval_records

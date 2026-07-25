@@ -51,6 +51,24 @@ py -X utf8 scripts/extract_minutes_model.py case-data/회의록_1차수정.hwpx 
 
 일반 `edits`의 `scope` 값은 `both` 또는 `approval`만 사용한다. 이 수정은 두 HWPX에 동일하게 적용된다. 정보공개 청구용에만 적용하는 식별정보 처리는 반드시 `redactions`에 `scope: "disclosure"`로 기록한다. `from`은 XML 텍스트 런 하나 안에 있는 전체 문구와 정확히 일치해야 한다. 결과 파일이 이미 있거나 치환 횟수가 `min_matches`보다 작으면 도구가 중단한다.
 
+실무자 판단에 따라 공개가 곤란한 **문장 전체**도 정보공개 청구용에서만 `[비공개]`로 가릴 수 있다. 이때도 `edits`가 아니라 `redactions`에 아래처럼 기록한다. 결재용에는 원문을 유지하며, 같은 문장이 여러 곳에 있어도 과다 가림이 생기지 않도록 정확히 한 곳만 처리한다.
+
+```json
+{
+  "id": "mask-sentence-001",
+  "approved": true,
+  "scope": "disclosure",
+  "from": "승인된 비공개 대상 문장 전체",
+  "to": "[비공개]",
+  "location": "section-0/paragraph-42",
+  "redaction_type": "문장 비공개",
+  "reason": "정보공개 시 제3자 권익 또는 심의 공정성 침해 우려",
+  "human_decision": "정보공개 담당 확인",
+  "min_matches": 1,
+  "max_matches": 1
+}
+```
+
 역할 표기 주변의 성명 후보를 로컬 승인 목록으로 준비할 때는 다음을 사용한다. 이 JSON에는 실제 성명이 들어가므로 사건자료 경로에서만 관리한다.
 
 ```powershell

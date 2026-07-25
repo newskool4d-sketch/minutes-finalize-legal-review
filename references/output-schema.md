@@ -58,11 +58,14 @@
 {
   "location": "쪽·문단·표셀 식별자",
   "source_value_summary": "실명 원문을 그대로 저장하지 않는 식별정보 요지",
-  "redaction_type": "성명|기관명|연락처|주소|기타 직접식별정보",
+  "redaction_type": "성명|기관명|연락처|주소|기타 직접식별정보|문장 비공개",
   "replacement": "○○|역할명|승인된 대체 표기",
   "reason": "정보공개 청구용 비실명 처리",
   "scope": "정보공개청구용 비실명 HWPX만",
   "approval_status": "제안|승인|반려|정보공개 담당 확인",
+  "human_decision": "담당자 승인|정보공개 담당 확인|법무 확인",
+  "min_matches": 1,
+  "max_matches": 1,
   "reviewer": "검토자 역할"
 }
 ```
@@ -75,6 +78,8 @@
 - `D`: 삭제·가림 검토(자동 반영 금지)
 - `L`: 법무 확인
 - `V`: 근거 확인
+
+`문장 비공개`는 정보공개 청구용에만 쓴다. `location`, `reason`, `human_decision`과 `min_matches: 1`, `max_matches: 1`을 모두 기록하고 결재용 실명 정본에는 원문을 유지한다.
 
 ## 검토표 생성 전제
 

@@ -27,6 +27,15 @@ def approved_redactions(specification: dict[str, Any]) -> list[dict[str, Any]]:
             raise ValueError(f"from 값이 비어 있습니다: {record.get('id', 'unknown')}")
         if not isinstance(record.get("to"), str):
             raise ValueError(f"to 값이 문자열이 아닙니다: {record.get('id', 'unknown')}")
+        if record.get("redaction_type") == "문장 비공개":
+            if not isinstance(record.get("location"), str) or not record["location"].strip():
+                raise ValueError(f"문장 비공개 위치가 없습니다: {record.get('id', 'unknown')}")
+            if not isinstance(record.get("reason"), str) or not record["reason"].strip():
+                raise ValueError(f"문장 비공개 사유가 없습니다: {record.get('id', 'unknown')}")
+            if record.get("human_decision") not in {"담당자 승인", "정보공개 담당 확인", "법무 확인"}:
+                raise ValueError(f"문장 비공개 실무자 판단이 없습니다: {record.get('id', 'unknown')}")
+            if int(record.get("min_matches", 1)) != 1 or int(record.get("max_matches", 1)) != 1:
+                raise ValueError(f"문장 비공개는 정확히 한 곳만 처리해야 합니다: {record.get('id', 'unknown')}")
         selected.append(record)
     return selected
 
@@ -63,6 +72,9 @@ def main() -> int:
             required = int(record.get("min_matches", 1))
             if total < required:
                 raise ValueError(f"비실명 처리 대조 실패: {record.get('id', 'unknown')} 치환 횟수 {total}")
+            maximum = record.get("max_matches")
+            if maximum is not None and total > int(maximum):
+                raise ValueError(f"비실명 처리 최대 횟수 초과: {record.get('id', 'unknown')} 치환 횟수 {total}")
             counts.append({"id": record.get("id", "unknown"), "changed_count": total, "files": per_file})
 
         changed_entries = [name for name in expected if expected[name] != disclosure_entries[name]]

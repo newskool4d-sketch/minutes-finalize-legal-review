@@ -124,6 +124,69 @@ class HwpxPipelineTests(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertIn("redactions", result.stderr)
 
+    def test_allows_one_human_approved_disclosure_sentence_mask(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            source = work / "source.hwpx"
+            synthetic_hwpx(source)
+            approved = work / "approved.json"
+            approved.write_text(
+                json.dumps(
+                    {
+                        "edits": [],
+                        "redactions": [
+                            {
+                                "id": "mask-sentence",
+                                "approved": True,
+                                "scope": "disclosure",
+                                "from": "위원 홍길동은 오타라고 진술함.",
+                                "to": "[비공개]",
+                                "location": "section-0/paragraph-3",
+                                "redaction_type": "문장 비공개",
+                                "reason": "합성 비공개 사유",
+                                "human_decision": "정보공개 담당 확인",
+                                "min_matches": 1,
+                                "max_matches": 1,
+                            }
+                        ],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            approval, disclosure = work / "approval.hwpx", work / "disclosure.hwpx"
+            result = run(
+                str(SCRIPTS / "apply_approved_edits.py"),
+                str(source),
+                "--approved",
+                str(approved),
+                "--approval-output",
+                str(approval),
+                "--disclosure-output",
+                str(disclosure),
+                "--audit",
+                str(work / "audit.json"),
+                "--redaction-ledger",
+                str(work / "ledger.json"),
+                cwd=ROOT,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            pair = run(
+                str(SCRIPTS / "verify_release_pair.py"),
+                "--approval",
+                str(approval),
+                "--disclosure",
+                str(disclosure),
+                "--approved",
+                str(approved),
+                cwd=ROOT,
+            )
+            self.assertEqual(pair.returncode, 0, pair.stderr)
+            with zipfile.ZipFile(approval) as archive:
+                self.assertIn("위원 홍길동은 오타라고 진술함.", archive.read("Contents/section0.xml").decode("utf-8"))
+            with zipfile.ZipFile(disclosure) as archive:
+                self.assertIn("[비공개]", archive.read("Contents/section0.xml").decode("utf-8"))
+
     def test_generates_two_safe_versions_and_audits(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)

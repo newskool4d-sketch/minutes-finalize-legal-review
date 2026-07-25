@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 
@@ -20,6 +21,24 @@ REQUIRED_TYPES = {"절차", "사실인정", "재량판단", "편견·예단", "�
 
 
 class ReviewFixtureTests(unittest.TestCase):
+    def test_sample_mask_plan_requires_explicit_local_paragraph_locations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            source, base, output = work / "source.hwpx", work / "base.json", work / "sample.json"
+            with zipfile.ZipFile(source, "w") as archive:
+                archive.writestr("mimetype", "application/hwp+zip")
+                archive.writestr("Contents/section0.xml", "<hp:section xmlns:hp=\"urn:test\"><hp:p><hp:run><hp:t>합성 민감 문장</hp:t></hp:run></hp:p></hp:section>")
+            base.write_text(json.dumps({"edits": [], "redactions": []}, ensure_ascii=False), encoding="utf-8")
+            script = ROOT / "scripts" / "build_sample_sentence_mask_plan.py"
+            result = subprocess.run(
+                [sys.executable, str(script), "--input", str(source), "--base", str(base), "--output", str(output), "--location", "section-0/paragraph-1", "--reason", "합성 사유", "--decision", "담당자 승인"],
+                cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            plan = json.loads(output.read_text(encoding="utf-8"))
+            self.assertTrue(plan["sample_only"])
+            self.assertEqual(plan["redactions"][0]["from"], "합성 민감 문장")
+
     def test_draft_generator_completes_text_free_template(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)

@@ -149,6 +149,15 @@ class HwpxPipelineTests(unittest.TestCase):
                         "edits": [],
                         "redactions": [
                             {
+                                "id": "redact-name-after-mask",
+                                "approved": True,
+                                "scope": "disclosure",
+                                "from": "홍길동",
+                                "to": "○○",
+                                "location": "section-0/paragraph-1",
+                                "redaction_type": "성명",
+                            },
+                            {
                                 "id": "mask-sentence",
                                 "approved": True,
                                 "scope": "disclosure",

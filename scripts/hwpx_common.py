@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import html
 import hashlib
 import json
 import re
@@ -13,6 +14,8 @@ from xml.etree import ElementTree as ET
 
 HWPX_MIMETYPE = b"application/hwp+zip"
 TEXT_ELEMENT = re.compile(r"(<hp:t\b[^>]*>)(.*?)(</hp:t>)", re.DOTALL)
+OPEN_PARAGRAPH_TAG = re.compile(rb"<(?:[A-Za-z_][\w.-]*:)?p\b[^>]*>")
+CLOSE_PARAGRAPH_TAG = re.compile(rb"</(?:[A-Za-z_][\w.-]*:)?p\s*>")
 
 
 def sha256_file(path: Path) -> str:
@@ -133,6 +136,52 @@ def replace_text_nodes(xml_bytes: bytes, source: str, replacement: str) -> tuple
 
     pattern = re.compile(TEXT_ELEMENT.pattern.encode("ascii"), re.DOTALL)
     return pattern.sub(replace_match, xml_bytes), changed
+
+
+def replace_paragraph_text(xml_bytes: bytes, paragraph_number: int, source: str, replacement: str) -> tuple[bytes, int]:
+    """Replace one whole HWPX paragraph while preserving its XML tags and runs.
+
+    A sentence may be split across several ``hp:t`` nodes.  This function uses a
+    structural paragraph ordinal plus an exact concatenated-text check, then
+    puts the replacement in the first text node and clears the remaining nodes.
+    """
+    if paragraph_number < 1:
+        raise ValueError("paragraph_number는 1 이상이어야 합니다.")
+    seen = 0
+    start: int | None = None
+    end: int | None = None
+    for match in OPEN_PARAGRAPH_TAG.finditer(xml_bytes):
+        seen += 1
+        if seen != paragraph_number:
+            continue
+        start = match.start()
+        if match.group(0).rstrip().endswith(b"/>"):
+            end = match.end()
+        else:
+            close = CLOSE_PARAGRAPH_TAG.search(xml_bytes, match.end())
+            if close:
+                end = close.end()
+        break
+    if start is None or end is None:
+        return xml_bytes, 0
+    paragraph = xml_bytes[start:end]
+    pattern = re.compile(TEXT_ELEMENT.pattern.encode("ascii"), re.DOTALL)
+    matches = list(pattern.finditer(paragraph))
+    if not matches:
+        return xml_bytes, 0
+    actual = "".join(html.unescape(match.group(2).decode("utf-8")) for match in matches).strip()
+    if actual != source:
+        return xml_bytes, 0
+    replacement_xml = _escape_xml_text(replacement)
+    rebuilt: list[bytes] = []
+    cursor = 0
+    for index, match in enumerate(matches):
+        rebuilt.append(paragraph[cursor:match.start()])
+        body = replacement_xml if index == 0 else b""
+        rebuilt.append(match.group(1) + body + match.group(3))
+        cursor = match.end()
+    rebuilt.append(paragraph[cursor:])
+    return xml_bytes[:start] + b"".join(rebuilt) + xml_bytes[end:], 1
 
 
 def _escape_xml_text(value: str) -> bytes:

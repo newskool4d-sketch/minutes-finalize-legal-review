@@ -16,6 +16,7 @@ from hwpx_common import (
     read_entry_map,
     read_json,
     replace_text_nodes,
+    replace_paragraph_text,
     section_names,
     sha256_file,
     validate_basic_hwpx,
@@ -69,12 +70,26 @@ def apply_records(
         source, replacement = require_replacement(record)
         total = 0
         per_file: dict[str, int] = {}
-        for filename in section_files:
-            changed_xml, count = replace_text_nodes(updated[filename], source, replacement)
-            if count:
+        if record.get("redaction_type") == "문장 비공개":
+            location = str(record["location"])
+            try:
+                section_part, paragraph_part = location.split("/", 1)
+                section_index = int(section_part.removeprefix("section-"))
+                paragraph_number = int(paragraph_part.removeprefix("paragraph-"))
+                filename = section_files[section_index]
+            except (IndexError, ValueError) as exc:
+                raise ValueError(f"{record.get('id', 'unknown')} 문장 비공개 위치 형식이 올바르지 않습니다: {location}") from exc
+            changed_xml, total = replace_paragraph_text(updated[filename], paragraph_number, source, replacement)
+            if total:
                 updated[filename] = changed_xml
-                per_file[filename] = count
-                total += count
+                per_file[filename] = total
+        else:
+            for filename in section_files:
+                changed_xml, count = replace_text_nodes(updated[filename], source, replacement)
+                if count:
+                    updated[filename] = changed_xml
+                    per_file[filename] = count
+                    total += count
         required = int(record.get("min_matches", 1))
         if total < required:
             raise ValueError(
@@ -165,7 +180,12 @@ def main() -> int:
 
         approval_records = selected(edits, REAL_SCOPES)
         disclosure_edits = approval_records
-        disclosure_redactions = selected(redactions, DISCLOSURE_REDACTION_SCOPES)
+        # Whole-sentence masks need to compare against the untouched paragraph.
+        # Apply them before name-level masks that may occur inside that paragraph.
+        disclosure_redactions = sorted(
+            selected(redactions, DISCLOSURE_REDACTION_SCOPES),
+            key=lambda record: 0 if record.get("redaction_type") == "문장 비공개" else 1,
+        )
 
         approval_entries, approval_audit = apply_records(entries, sections, approval_records, "결재용")
         disclosure_entries, disclosure_audit = apply_records(

@@ -43,6 +43,8 @@ def main() -> int:
         "scripts/detect_legal_review_candidates.py",
         "scripts/render_legal_review_report.py",
         "scripts/validate_operation_metrics.py",
+        "scripts/check_markdown_links.py",
+        "scripts/check_powershell_scripts.py",
         "scripts/verify_release_pair.py",
     ]
     for relative in required:

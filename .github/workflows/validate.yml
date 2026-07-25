@@ -21,5 +21,9 @@ jobs:
         run: python scripts/validate_skill.py
       - name: Check tracked-file safety
         run: python scripts/check_repository_safety.py
+      - name: Check Markdown local links
+        run: python scripts/check_markdown_links.py
+      - name: Check PowerShell script safety
+        run: python scripts/check_powershell_scripts.py
       - name: Run synthetic regression tests
         run: python -m unittest discover -s tests -v

@@ -51,6 +51,15 @@ py -X utf8 scripts/extract_minutes_model.py case-data/회의록_1차수정.hwpx 
 
 일반 `edits`의 `scope` 값은 `both` 또는 `approval`만 사용한다. 이 수정은 두 HWPX에 동일하게 적용된다. 정보공개 청구용에만 적용하는 식별정보 처리는 반드시 `redactions`에 `scope: "disclosure"`로 기록한다. `from`은 XML 텍스트 런 하나 안에 있는 전체 문구와 정확히 일치해야 한다. 결과 파일이 이미 있거나 치환 횟수가 `min_matches`보다 작으면 도구가 중단한다.
 
+역할 표기 주변의 성명 후보를 로컬 승인 목록으로 준비할 때는 다음을 사용한다. 이 JSON에는 실제 성명이 들어가므로 사건자료 경로에서만 관리한다.
+
+```powershell
+py -X utf8 scripts/prepare_redactions.py case-data/회의록_1차수정.hwpx `
+  --output case-data/redaction-candidates.json
+```
+
+후보를 사람이 승인한 뒤 `approved: true`로 바꾸거나, 명시적으로 자동 승인 사용이 허용된 경우에만 `--approve-detected`를 사용한다.
+
 ## 3. 두 HWPX 생성
 
 ```powershell

@@ -39,6 +39,7 @@ def main() -> int:
         "references/checklist.md",
         "references/output-schema.md",
         "scripts/apply_approved_edits.py",
+        "scripts/prepare_redactions.py",
         "scripts/verify_release_pair.py",
     ]
     for relative in required:

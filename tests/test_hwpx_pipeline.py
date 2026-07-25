@@ -26,6 +26,7 @@ def run(*arguments: str, cwd: Path) -> subprocess.CompletedProcess[str]:
 def synthetic_hwpx(path: Path) -> None:
     section = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <hp:section xmlns:hp=\"http://www.hancom.co.kr/hwpml/2011/paragraph\">
+  <hp:p><hp:run><hp:t>위원1(위원장) 홍길동</hp:t></hp:run></hp:p>
   <hp:p><hp:run><hp:t>위원 홍길동은 오타라고 진술함.</hp:t></hp:run></hp:p>
   <hp:tbl><hp:tr><hp:tc><hp:subList><hp:p><hp:run><hp:t>표결 3명 찬성</hp:t></hp:run></hp:p></hp:subList></hp:tc></hp:tr></hp:tbl>
 </hp:section>""".encode("utf-8")
@@ -39,6 +40,25 @@ def synthetic_hwpx(path: Path) -> None:
 
 
 class HwpxPipelineTests(unittest.TestCase):
+    def test_prepares_role_context_redactions_without_printing_values(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            source = work / "source.hwpx"
+            synthetic_hwpx(source)
+            candidates = work / "candidates.json"
+            result = run(
+                str(SCRIPTS / "prepare_redactions.py"),
+                str(source),
+                "--output",
+                str(candidates),
+                "--approve-detected",
+                cwd=ROOT,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(candidates.read_text(encoding="utf-8"))
+            self.assertEqual(len(payload["redactions"]), 1)
+            self.assertTrue(payload["redactions"][0]["approved"])
+
     def test_refuses_disclosure_only_content_edit(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
@@ -173,7 +193,8 @@ class HwpxPipelineTests(unittest.TestCase):
 
             ledger_text = ledger.read_text(encoding="utf-8")
             self.assertNotIn("홍길동", ledger_text)
-            self.assertEqual(json.loads(ledger_text)[0]["changed_count"], 1)
+            # The same approved name appears in the roster and in the body.
+            self.assertEqual(json.loads(ledger_text)[0]["changed_count"], 2)
 
             model = work / "model.json"
             extraction = run(

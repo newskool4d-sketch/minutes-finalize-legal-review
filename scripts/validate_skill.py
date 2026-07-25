@@ -33,6 +33,8 @@ def main() -> int:
 
     required = [
         "agents/openai.yaml",
+        "VERSION",
+        "SECURITY.md",
         "profiles/README.md",
         "references/checklist.md",
         "references/output-schema.md",
@@ -42,6 +44,10 @@ def main() -> int:
     for relative in required:
         if not (ROOT / relative).is_file():
             fail(f"필수 파일이 없습니다: {relative}")
+
+    version = (ROOT / "VERSION").read_text(encoding="utf-8").strip()
+    if not re.fullmatch(r"\d+\.\d+\.\d+", version):
+        fail("VERSION은 semver 형식이어야 합니다.")
 
     agent = (ROOT / "agents/openai.yaml").read_text(encoding="utf-8")
     if f"${SKILL_NAME}" not in agent:

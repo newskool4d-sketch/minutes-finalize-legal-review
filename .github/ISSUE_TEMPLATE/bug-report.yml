@@ -1,0 +1,39 @@
+name: 오류 또는 개선 제안
+description: 실제 회의록·실명·HWPX 파일 없이 재현 가능한 문제를 제보합니다.
+title: "[Issue]: "
+labels: ["triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        실제 회의록, HWPX, 실명, 사건번호, 연락처, 건강정보, API 키를 입력하거나 첨부하지 마십시오.
+  - type: input
+    id: version
+    attributes:
+      label: 스킬 버전
+      placeholder: "0.2.0"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 기대한 결과
+      description: 합성 문구 또는 일반화한 설명만 작성합니다.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: 실제 결과
+      description: 민감정보를 삭제한 오류 유형·로그만 작성합니다.
+    validations:
+      required: true
+  - type: dropdown
+    id: sensitive
+    attributes:
+      label: 실제 사건자료를 포함했습니까?
+      options:
+        - "아니오"
+        - "예, 이슈를 중단하고 비공개 경로로 전환하겠습니다"
+    validations:
+      required: true

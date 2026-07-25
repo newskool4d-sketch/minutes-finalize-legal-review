@@ -41,6 +41,7 @@ def main() -> int:
         "scripts/apply_approved_edits.py",
         "scripts/prepare_redactions.py",
         "scripts/detect_legal_review_candidates.py",
+        "scripts/prepare_legal_review_template.py",
         "scripts/render_legal_review_report.py",
         "scripts/validate_operation_metrics.py",
         "scripts/check_markdown_links.py",

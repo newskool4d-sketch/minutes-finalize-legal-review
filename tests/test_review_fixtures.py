@@ -15,6 +15,7 @@ FIXTURE = Path(__file__).resolve().parent / "fixtures" / "synthetic-review-cases
 ROOT = FIXTURE.parents[2]
 RENDER = ROOT / "scripts" / "render_legal_review_report.py"
 METRICS = ROOT / "scripts" / "validate_operation_metrics.py"
+TEMPLATE = ROOT / "scripts" / "prepare_legal_review_template.py"
 REQUIRED_TYPES = {"절차", "사실인정", "재량판단", "편견·예단", "개인정보", "기록무결성", "법적 근거"}
 
 
@@ -81,6 +82,24 @@ class ReviewFixtureTests(unittest.TestCase):
             source.write_text(json.dumps(metrics, ensure_ascii=False), encoding="utf-8")
             rejected = subprocess.run([sys.executable, str(METRICS), str(source)], capture_output=True, text=True, encoding="utf-8", errors="replace")
             self.assertNotEqual(rejected.returncode, 0)
+
+    def test_candidate_template_keeps_text_out_and_requires_human_completion(self) -> None:
+        candidates = {
+            "source_document_hash": "a" * 64,
+            "candidates": [{"location_id": "section-0/paragraph-4", "statement_text_hash": "b" * 64,
+                            "rule_id": "sensitive-health", "legal_issue_type": ["개인정보"],
+                            "risk_level": "높음", "action_code": "L"}],
+        }
+        with tempfile.TemporaryDirectory() as temp:
+            work = Path(temp)
+            source, output = work / "candidates.json", work / "template.json"
+            source.write_text(json.dumps(candidates, ensure_ascii=False), encoding="utf-8")
+            result = subprocess.run([sys.executable, str(TEMPLATE), str(source), "--case-token", "synthetic-case", "--output", str(output)], capture_output=True, text=True, encoding="utf-8", errors="replace")
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(payload["issues"][0]["location_id"], "section-0/paragraph-4")
+            self.assertNotIn("홍길동", output.read_text(encoding="utf-8"))
+            self.assertEqual(payload["issues"][0]["approval_status"], "미검토")
 
 
 if __name__ == "__main__":

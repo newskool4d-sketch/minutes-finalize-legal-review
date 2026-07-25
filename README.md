@@ -105,6 +105,14 @@ py -X utf8 scripts\detect_legal_review_candidates.py .\case-data\회의록_1차�
   --output .\case-data\법률위험_후보.json
 ```
 
+후보 위치를 사람 검토용 검토표 JSON으로 옮길 때는 다음을 사용합니다. 이 템플릿은 미완성 상태이므로, 실무자가 발언 요지·증거·법령 근거·승인 판단을 채운 뒤에만 검토표 렌더링을 실행합니다.
+
+```powershell
+py -X utf8 scripts\prepare_legal_review_template.py .\case-data\법률위험_후보.json `
+  --case-token "기관내부-비식별값" `
+  --output .\case-data\법률위험_검토표_작성템플릿.json
+```
+
 시범 운영에서는 [운영 성과지표](references/operation-metrics.md)에 주무관·담당 장학사 검토시간과 비식별 반려 사유 코드를 기록합니다.
 5. 사람이 승인한 변경만 결재용 실명 정본에 반영하고, 승인된 비실명 처리만 정보공개 청구용 HWPX에 적용합니다.
 

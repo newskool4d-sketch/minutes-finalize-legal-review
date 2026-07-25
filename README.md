@@ -98,6 +98,13 @@ py -X utf8 scripts\render_legal_review_report.py .\case-data\review.json `
 
 입력 필드 형식은 [출력 스키마](references/output-schema.md)를 따릅니다. 이 명령은 회의록 HWPX를 읽거나 외부 MCP로 전송하지 않으며, 검토자가 별도로 작성한 비식별 기록만 렌더링합니다.
 
+초기 후보 위치만 로컬에서 찾으려면 아래 도구를 쓸 수 있습니다. 후보 JSON에는 원문·일치 단어를 저장하지 않으며, 자동 법률판단이나 자동 수정도 하지 않습니다.
+
+```powershell
+py -X utf8 scripts\detect_legal_review_candidates.py .\case-data\회의록_1차수정.hwpx `
+  --output .\case-data\법률위험_후보.json
+```
+
 시범 운영에서는 [운영 성과지표](references/operation-metrics.md)에 주무관·담당 장학사 검토시간과 비식별 반려 사유 코드를 기록합니다.
 5. 사람이 승인한 변경만 결재용 실명 정본에 반영하고, 승인된 비실명 처리만 정보공개 청구용 HWPX에 적용합니다.
 

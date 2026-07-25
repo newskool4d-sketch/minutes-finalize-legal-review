@@ -24,7 +24,7 @@ def run(*arguments: str, cwd: Path) -> subprocess.CompletedProcess[str]:
 
 
 def synthetic_hwpx(path: Path, label: str = "기본") -> None:
-    section = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+    section = f"""<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <hp:section xmlns:hp=\"http://www.hancom.co.kr/hwpml/2011/paragraph\">
   <hp:p><hp:run><hp:t>위원1(위원장) 홍길동</hp:t></hp:run></hp:p>
   <hp:p><hp:run><hp:t>합성 검증 사례: {label}</hp:t></hp:run></hp:p>
@@ -41,6 +41,19 @@ def synthetic_hwpx(path: Path, label: str = "기본") -> None:
 
 
 class HwpxPipelineTests(unittest.TestCase):
+    def test_legal_candidate_detector_keeps_text_out_of_output(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            source = work / "source.hwpx"
+            synthetic_hwpx(source, "공식 자료 없는 진단 추정")
+            candidates = work / "candidates.json"
+            result = run(str(SCRIPTS / "detect_legal_review_candidates.py"), str(source), "--output", str(candidates), cwd=ROOT)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = candidates.read_text(encoding="utf-8")
+            self.assertIn("sensitive-health", text)
+            self.assertNotIn("진단", text)
+            self.assertNotIn("홍길동", text)
+
     def test_validates_five_distinct_synthetic_hwpx_packages(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)

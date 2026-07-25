@@ -43,7 +43,7 @@ class ReviewFixtureTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
             template = work / "template.json"
-            draft = work / "draft.json"
+            draft, report = work / "draft.json", work / "draft.md"
             template.write_text(
                 json.dumps(
                     {
@@ -66,6 +66,11 @@ class ReviewFixtureTests(unittest.TestCase):
             self.assertEqual(payload["issues"][0]["action_code"], "L")
             self.assertEqual(payload["case"]["event_dates"]["event_date"], "미확인")
             self.assertNotIn("홍길동", json.dumps(payload, ensure_ascii=False))
+            render = subprocess.run(
+                [sys.executable, str(RENDER), str(draft), "--output", str(report)],
+                cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            )
+            self.assertEqual(render.returncode, 0, render.stderr)
 
     def test_fixture_has_ten_unique_high_value_cases(self) -> None:
         payload = json.loads(FIXTURE.read_text(encoding="utf-8"))

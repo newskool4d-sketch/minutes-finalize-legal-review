@@ -19,10 +19,8 @@ HWPX 회의록의 1차 수정본을 2차 정본으로 정리하면서, 발언별
 저장소를 원하는 위치에 복제합니다.
 
 ```powershell
-git clone https://github.com/사용자명/minutes-finalize-legal-review.git
+git clone https://github.com/newskool4d-sketch/minutes-finalize-legal-review.git
 ```
-
-`사용자명`은 실제 저장소가 생성된 뒤의 GitHub 계정명으로 바꿉니다.
 
 ### 2. Codex에 설치
 
@@ -67,9 +65,124 @@ Claude Code를 새로 시작한 후 다음과 같이 요청합니다.
 
 전사 원본이 없는 경우에도 사용할 수 있습니다. 이때는 전사 누락 여부를 판단하지 않고 1차 수정본의 정본화·법률위험 검토만 수행합니다.
 
-## 법령 MCP
+## Korean Law MCP 설치 및 연결
 
-법령·판례 MCP가 설치되어 있으면 법률 검토 시 이를 우선 사용합니다. 사건일·처분일·관할을 기준으로 조문과 시행일을 확인하고, MCP 출처 식별자를 검토표에 기록합니다. MCP가 없거나 호출되지 않으면 공식 법령 원문·고시와 기관 프로필로 대체합니다. MCP 요약만으로 위법 여부를 확정하지 않습니다.
+이 스킬은 법률 검토가 필요한 경우 설치되어 있는 법령·판례 MCP를 우선 사용합니다. 아래는 [Korean Law MCP 안내 페이지](https://chris.gomdori.app/pages/korean-law-mcp)와 [공식 설치 문서](https://github.com/chrisryugj/korean-law-mcp)를 기준으로 정리한 선택형 설치 방법입니다.
+
+### 먼저: 법제처 Open API 키(OC) 발급
+
+1. [법제처 Open API](https://open.law.go.kr/)에 로그인합니다.
+2. `Open API 사용 신청`에서 OC 키를 발급받습니다.
+3. 키는 비밀번호와 같이 취급하고 README, Git 저장소, 로그, 화면 캡처에 남기지 않습니다.
+
+아래 예시의 `본인_OC키`는 실제 키로 바꾸되, 명령 기록이나 설정 파일을 공유할 때는 반드시 삭제합니다.
+
+### 권장: 민감한 회의록은 로컬 MCP로 설치
+
+실명·건강정보·교권침해 내용이 포함된 회의록을 검토할 때는 기관에서 허용한 PC에 로컬 MCP를 설치하는 방법을 우선합니다. Node.js 18 이상이 필요합니다.
+
+자동 설정 마법사:
+
+```powershell
+npx korean-law-mcp setup
+```
+
+수동 설치 및 API 키 설정(PowerShell):
+
+```powershell
+npm install -g korean-law-mcp
+$env:LAW_OC = "본인_OC키"
+```
+
+MCP 클라이언트가 stdio 서버 설정을 요구하면 다음 형태를 사용합니다.
+
+```json
+{
+  "mcpServers": {
+    "korean-law": {
+      "command": "korean-law-mcp",
+      "env": {
+        "LAW_OC": "본인_OC키"
+      }
+    }
+  }
+}
+```
+
+Codex에서는 설치된 버전의 MCP 설정 UI 또는 설정 파일 형식에 맞춰 `command`와 `LAW_OC`를 등록합니다. API 키를 대화 입력에 반복해서 붙여 넣거나 저장소 파일에 기록하지 않습니다.
+
+### Claude Code 플러그인 설치
+
+Claude Code에서 공식 플러그인을 사용할 수 있습니다.
+
+```text
+/plugin marketplace add chrisryugj/korean-law-mcp
+/plugin install korean-law@korean-law-marketplace
+```
+
+설치 과정에서 OC 키를 입력합니다. 업데이트할 때는 다음을 실행합니다.
+
+```text
+/plugin marketplace update korean-law-marketplace
+```
+
+`Permission denied (publickey)`가 표시되면 SSH 대신 HTTPS로 GitHub를 사용하도록 한 번 설정한 뒤 다시 시도합니다.
+
+```powershell
+git config --global url."https://github.com/".insteadOf "git@github.com:"
+```
+
+### Claude Desktop 연결
+
+Claude Desktop은 `%APPDATA%\Claude\claude_desktop_config.json`에 설정하며 Node.js 18 이상과 `mcp-remote`가 필요합니다.
+
+```json
+{
+  "mcpServers": {
+    "korean-law": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "https://mcp.gomdori.app/law?oc=본인_OC키"
+      ]
+    }
+  }
+}
+```
+
+저장 후 Claude Desktop을 재시작하고 MCP 도구가 표시되는지 확인합니다.
+
+### 원격 커넥터(기관 승인 및 비민감 질의에 한함)
+
+Korean Law MCP의 원격 주소는 `https://mcp.gomdori.app/law`입니다. Claude.ai·Cursor·Windsurf 등에서 원격 HTTP MCP를 지원하면 다음 URL을 등록할 수 있습니다.
+
+```text
+https://mcp.gomdori.app/law?oc=본인_OC키
+```
+
+원격 연결은 질의가 외부 서버로 전송될 수 있으므로, 기관의 보안·개인정보·외부 AI 사용 승인을 먼저 확인합니다. 실명 회의록 전문, 주민번호, 주소, 건강정보, 사건 식별정보를 원격 MCP에 붙여 넣지 말고 조문·판례 검색어처럼 비식별화된 최소 질의만 사용합니다. 승인이 없으면 로컬 설치를 사용합니다.
+
+### 설치 확인용 CLI 테스트
+
+```powershell
+npm install -g korean-law-mcp
+$env:LAW_OC = "본인_OC키"
+korean-law "교원의 지위 향상 및 교육활동 보호를 위한 특별법 제25조"
+korean-law list
+```
+
+정상 작동 후에는 회의록 법률 검토표에 법령명·조문·시행일·조회일·MCP 출처 식별자를 남깁니다. 검색 결과의 요약만으로 위법 여부를 확정하지 않고, 공식 원문과 사건의 사실관계를 담당자가 대조합니다.
+
+### 연결 문제 및 폐쇄망 참고
+
+기본 통신은 HTTPS입니다. 폐쇄망에서 기관 정책상 HTTP 프록시가 필요한 경우에만 MCP 운영자 안내와 보안 승인을 확인한 뒤 다음 환경변수를 검토합니다.
+
+```powershell
+$env:LAW_API_PROTOCOL = "http"
+```
+
+이 설정은 기본값이 아니며, 네트워크 정책을 우회하기 위한 용도로 사용하지 않습니다. MCP가 없거나 호출되지 않으면 공식 법령 원문·고시와 기관 프로필로 대체합니다.
 
 ## 개인정보·파일 정책
 

@@ -36,6 +36,7 @@ def main() -> int:
         "VERSION",
         "SECURITY.md",
         "profiles/README.md",
+        "examples/pilot-metrics.example.json",
         "references/checklist.md",
         "references/output-schema.md",
         "scripts/apply_approved_edits.py",

@@ -135,6 +135,15 @@ class ReviewFixtureTests(unittest.TestCase):
             rejected = subprocess.run([sys.executable, str(METRICS), str(source)], capture_output=True, text=True, encoding="utf-8", errors="replace")
             self.assertNotEqual(rejected.returncode, 0)
 
+    def test_pilot_metric_example_is_valid_and_non_sensitive(self) -> None:
+        example = ROOT / "examples" / "pilot-metrics.example.json"
+        result = subprocess.run(
+            [sys.executable, str(METRICS), str(example)],
+            cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("회의록", example.read_text(encoding="utf-8"))
+
     def test_pilot_metric_summary_requires_three_and_excludes_case_tokens(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             work = Path(temp)

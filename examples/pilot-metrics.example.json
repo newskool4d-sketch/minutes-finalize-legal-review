@@ -1,0 +1,18 @@
+{
+  "case_token": "pilot-001",
+  "pages": 0,
+  "review_minutes_before": 0,
+  "review_minutes_after": 0,
+  "officer_review_minutes": 0,
+  "supervisor_review_minutes": 0,
+  "ai_suggestions": 0,
+  "approved_suggestions": 0,
+  "rejected_suggestions": 0,
+  "rejection_reason_codes": [],
+  "high_risk_items": 0,
+  "legal_confirmation_items": 0,
+  "human_found_omissions": 0,
+  "metadata_or_vote_errors": 0,
+  "hwpx_structure_pass": false,
+  "hancom_open_pass": false
+}

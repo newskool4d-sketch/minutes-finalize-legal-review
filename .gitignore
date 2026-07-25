@@ -1,0 +1,20 @@
+# Sensitive source and output files: never commit case materials.
+*.hwp
+*.hwpx
+*.hwpml
+**/outputs/
+**/case-data/
+**/samples-real/
+**/*실명*
+**/*원본*
+**/*초안*
+**/*수정본*
+*.bak
+*.tmp
+*.log
+
+# Local tooling
+.venv/
+__pycache__/
+.DS_Store
+Thumbs.db

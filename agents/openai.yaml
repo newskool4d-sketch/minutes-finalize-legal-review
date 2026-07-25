@@ -1,0 +1,4 @@
+interface:
+  display_name: "회의록 정본화·법률검토"
+  short_description: "HWPX 회의록을 정본화하고 법률·절차 위험을 검토합니다"
+  default_prompt: "1차 수정된 회의록 HWPX와 시나리오를 기준으로 2차 정본을 제안하고 발언별 법률위험을 검토해 주세요."

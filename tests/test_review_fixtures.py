@@ -20,6 +20,33 @@ REQUIRED_TYPES = {"절차", "사실인정", "재량판단", "편견·예단", "�
 
 
 class ReviewFixtureTests(unittest.TestCase):
+    def test_draft_generator_completes_text_free_template(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            template = work / "template.json"
+            draft = work / "draft.json"
+            template.write_text(
+                json.dumps(
+                    {
+                        "case": {"case_token": "synthetic", "reviewed_at": "2026-07-25", "reviewer_role": "[실무자 지정 필요]", "source_document_hash": "hash"},
+                        "issues": [{
+                            "issue_id": "issue-001", "location": "section-0/paragraph-1", "location_id": "section-0/paragraph-1",
+                            "statement_text_hash": "hash", "candidate_rule": "sensitive-health", "legal_issue_type": "개인정보",
+                            "risk_level": "높음", "action_code": "L",
+                        }],
+                    }, ensure_ascii=False), encoding="utf-8"
+                )
+            generator = ROOT / "scripts" / "generate_draft_legal_review.py"
+            result = subprocess.run(
+                [sys.executable, str(generator), str(template), "--output", str(draft), "--reference-date", "2026-07-25"],
+                cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            payload = json.loads(draft.read_text(encoding="utf-8"))
+            self.assertEqual(payload["issues"][0]["approval_status"], "미검토")
+            self.assertEqual(payload["issues"][0]["action_code"], "L")
+            self.assertNotIn("홍길동", json.dumps(payload, ensure_ascii=False))
+
     def test_fixture_has_ten_unique_high_value_cases(self) -> None:
         payload = json.loads(FIXTURE.read_text(encoding="utf-8"))
         cases = payload["cases"]

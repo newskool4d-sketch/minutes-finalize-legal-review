@@ -45,7 +45,7 @@ class HwpxPipelineTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)
             source = work / "source.hwpx"
-            synthetic_hwpx(source, "공식 자료 없는 진단 추정")
+            synthetic_hwpx(source, "홍길동은 공식 자료 없는 진단 추정")
             candidates = work / "candidates.json"
             result = run(str(SCRIPTS / "detect_legal_review_candidates.py"), str(source), "--output", str(candidates), cwd=ROOT)
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -53,6 +53,19 @@ class HwpxPipelineTests(unittest.TestCase):
             self.assertIn("sensitive-health", text)
             self.assertNotIn("진단", text)
             self.assertNotIn("홍길동", text)
+
+    def test_candidate_context_export_masks_names(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            source = work / "source.hwpx"
+            synthetic_hwpx(source, "홍길동은 공식 자료 없는 진단 추정")
+            candidates, contexts = work / "candidates.json", work / "contexts.json"
+            candidates.write_text(json.dumps({"candidates": [{"location_id": "section-0/paragraph-1", "rule_id": "sensitive-health"}]}, ensure_ascii=False), encoding="utf-8")
+            result = run(str(SCRIPTS / "export_candidate_context.py"), str(source), "--candidates", str(candidates), "--output", str(contexts), cwd=ROOT)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = contexts.read_text(encoding="utf-8")
+            self.assertNotIn("홍길동", text)
+            self.assertIn("[성명]", text)
 
     def test_validates_five_distinct_synthetic_hwpx_packages(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

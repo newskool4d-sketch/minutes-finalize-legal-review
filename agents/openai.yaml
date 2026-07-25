@@ -1,4 +1,4 @@
 interface:
   display_name: "회의록 정본화·법률검토"
-  short_description: "HWPX 회의록을 정본화하고 법률·절차 위험을 검토합니다"
-  default_prompt: "1차 수정된 회의록 HWPX와 시나리오를 기준으로 2차 정본을 제안하고 발언별 법률위험을 검토해 주세요."
+  short_description: "결재용 실명본과 정보공개 비실명본 HWPX를 정본화·검토합니다"
+  default_prompt: "$minutes-hwpx-finalize-legal-review를 사용해 결재용 실명 정본 HWPX와 정보공개 청구용 비실명 HWPX를 제안하고 법률위험을 검토해 주세요."

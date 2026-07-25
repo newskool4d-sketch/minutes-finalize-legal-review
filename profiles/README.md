@@ -10,3 +10,4 @@
 현재 포함된 프로필:
 
 - `education-rights-ko.md`: 한국 교육활동 침해·교권보호위원회 업무용
+- `generic-committee-ko.md`: 한국 공공기관 일반 심의·위원회 업무용

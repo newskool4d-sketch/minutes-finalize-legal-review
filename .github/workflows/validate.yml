@@ -1,0 +1,25 @@
+name: Validate skill
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Validate repository structure
+        run: python scripts/validate_skill.py
+      - name: Check tracked-file safety
+        run: python scripts/check_repository_safety.py
+      - name: Run synthetic regression tests
+        run: python -m unittest discover -s tests -v

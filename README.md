@@ -8,7 +8,7 @@ HWPX 회의록의 1차 수정본을 2차 정본으로 정리하면서, 발언별
 - 시나리오·사안자료·서면·표결자료 대조
 - 사실·출처·개인정보·절차·점수 근거 검토
 - 유지·요지화·중립화·삭제 검토·근거 확인·법무 확인 제안
-- 결재용 원본과 공개용 비식별본 분리
+- 결재용 실명 정본 HWPX와 정보공개 청구용 비실명 HWPX 분리
 
 이 패키지는 특정 사건의 HWP/HWPX 원본 또는 실명 자료를 포함하지 않습니다. 법률 기준은 기관·관할·시행일에 따라 `profiles/`에서 선택합니다.
 
@@ -28,7 +28,7 @@ PowerShell에서 저장소 폴더 전체를 Codex 스킬 경로에 복사합니�
 
 ```powershell
 $source = '.\\minutes-finalize-legal-review'
-$target = "$env:USERPROFILE\\.codex\\skills\\minutes-finalize-legal-review"
+$target = "$env:USERPROFILE\\.codex\\skills\\minutes-hwpx-finalize-legal-review"
 New-Item -ItemType Directory -Force -Path $target | Out-Null
 Copy-Item "$source\\SKILL.md" "$target\\SKILL.md" -Force
 Copy-Item "$source\\agents" "$target" -Recurse -Force
@@ -38,13 +38,21 @@ Copy-Item "$source\\profiles" "$target" -Recurse -Force
 
 설치 후 Codex를 새로 시작하면 스킬 목록에서 `minutes-hwpx-finalize-legal-review`를 사용할 수 있습니다.
 
+반복 설치에는 저장소의 스크립트를 사용할 수 있습니다. 기본은 미리보기이며, 실제 복사·백업은 `-Apply`가 있을 때만 수행합니다.
+
+```powershell
+.\scripts\install.ps1 -Target Codex
+.\scripts\install.ps1 -Target Codex -Apply
+.\scripts\verify_install.ps1 -Target Codex
+```
+
 ### 3. Claude Code에 설치
 
 Claude Code도 같은 파일 구조를 사용합니다. 아래 명령으로 Claude 전용 경로에 복사합니다.
 
 ```powershell
 $source = '.\\minutes-finalize-legal-review'
-$target = "$env:USERPROFILE\\.claude\\skills\\minutes-finalize-legal-review"
+$target = "$env:USERPROFILE\\.claude\\skills\\minutes-hwpx-finalize-legal-review"
 New-Item -ItemType Directory -Force -Path $target | Out-Null
 Copy-Item "$source\\SKILL.md" "$target\\SKILL.md" -Force
 Copy-Item "$source\\references" "$target" -Recurse -Force
@@ -53,17 +61,33 @@ Copy-Item "$source\\profiles" "$target" -Recurse -Force
 
 Claude Code를 새로 시작한 후 다음과 같이 요청합니다.
 
-> 1차 수정된 회의록 HWPX와 시나리오를 기준으로 2차 정본을 제안하고, 발언별 법률위험을 검토해 주세요.
+> 1차 수정된 회의록 HWPX와 시나리오를 기준으로 결재용 실명 정본 HWPX와 정보공개 청구용 비실명 HWPX를 제안하고, 발언별 법률위험을 검토해 주세요.
+
+Claude Code 자동 설치는 `-Target Claude`를 사용합니다.
+
+```powershell
+.\scripts\install.ps1 -Target Claude
+.\scripts\install.ps1 -Target Claude -Apply
+.\scripts\verify_install.ps1 -Target Claude
+```
+
+제거 스크립트도 기본은 미리보기입니다. `-Apply`를 쓰면 해당 스킬 폴더만 백업 후 제거합니다.
 
 ## 기본 사용 순서
 
 1. `SKILL.md`를 읽고 입력·출력 범위를 확인합니다.
 2. 업무 관할에 맞는 `profiles/` 파일을 선택합니다.
 3. 1차 수정본 HWPX와 시나리오를 입력합니다.
-4. 정본화 제안과 법률위험 검토표를 별도로 생성합니다.
-5. 사람이 승인한 변경만 최종 HWPX에 반영합니다.
+4. 결재용 실명 정본 HWPX, 정보공개 청구용 비실명 HWPX, 법률위험 검토표를 별도로 생성합니다.
+5. 사람이 승인한 변경만 결재용 실명 정본에 반영하고, 승인된 비실명 처리만 정보공개 청구용 HWPX에 적용합니다.
 
 전사 원본이 없는 경우에도 사용할 수 있습니다. 이때는 전사 누락 여부를 판단하지 않고 1차 수정본의 정본화·법률위험 검토만 수행합니다.
+
+## HWPX 산출 도구
+
+저장소의 `scripts/`는 승인된 수정만 반영해 결재용 실명 정본 HWPX와 정보공개 청구용 비실명 HWPX를 새 파일로 만듭니다. 원본 HWPX를 덮어쓰지 않으며, 결과의 ZIP·XML 구조와 원본 대비 문단·표 수를 검사합니다.
+
+실제 사건자료는 `case-data/` 등 기관 승인 경로에서만 처리하고 Git에 커밋하지 않습니다. 전체 사용법과 승인 목록 형식은 [HWPX 처리 도구](references/hwpx-tooling.md)를 확인합니다. 최종 제출 전에는 한글 프로그램에서 두 HWPX를 실제로 열어 형식·페이지·표 구조를 확인해야 합니다.
 
 ## Korean Law MCP 설치 및 연결
 
@@ -187,7 +211,8 @@ $env:LAW_API_PROTOCOL = "http"
 ## 개인정보·파일 정책
 
 - HWP·HWPX·실명 자료는 이 저장소에 커밋하지 않습니다.
-- 결재용 실명본과 공개용 비식별본을 별도 파일로 관리합니다.
+- 결재용 실명 정본 HWPX와 정보공개 청구용 비실명 HWPX를 별도 파일로 관리합니다.
+- 정보공개 청구용 비실명 HWPX는 결재용 실명 정본의 의결·표결·사실관계·표와 문단 구조를 유지하고, 승인된 식별정보만 처리합니다.
 - AI가 자동으로 발언을 삭제하거나 사실·법률 위반을 확정하지 않습니다.
 - `D 삭제 검토`와 `L 법무 확인`은 담당자 승인 전까지 제안 상태로 유지합니다.
 

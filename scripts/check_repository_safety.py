@@ -5,12 +5,19 @@ from __future__ import annotations
 
 import subprocess
 import sys
+import re
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 PROHIBITED_SUFFIXES = {".hwp", ".hwpx", ".hwpml"}
 PROHIBITED_PATH_MARKERS = ("실명", "원본", "초안", "수정본", "case-data", "samples-real")
+TEXT_SUFFIXES = {".md", ".json", ".py", ".ps1", ".yml", ".yaml", ".txt", ".gitignore"}
+SECRET_PATTERNS = (
+    re.compile(r"\\bgh[pousr]_[A-Za-z0-9_]{20,}\\b"),
+    re.compile(r"\\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}\\b"),
+    re.compile(r"(?:[?&]oc=|LAW_OC\\s*[=:])\\s*(?!본인_OC키\\b|YOUR_[A-Z_]+\\b)[A-Za-z0-9_-]{16,}", re.IGNORECASE),
+)
 
 
 def repository_paths() -> list[str]:
@@ -37,6 +44,14 @@ def main() -> int:
             problems.append(f"금지된 문서 확장자: {relative}")
         if any(marker in normalized for marker in PROHIBITED_PATH_MARKERS):
             problems.append(f"사건자료로 보이는 추적 경로: {relative}")
+        if path.suffix.lower() in TEXT_SUFFIXES or path.name == ".gitignore":
+            try:
+                content = (ROOT / path).read_text(encoding="utf-8")
+            except UnicodeDecodeError:
+                problems.append(f"UTF-8로 읽을 수 없는 텍스트 파일: {relative}")
+                continue
+            if any(pattern.search(content) for pattern in SECRET_PATTERNS):
+                problems.append(f"비밀값으로 보이는 문자열: {relative}")
     if problems:
         print("FAIL:\n" + "\n".join(problems), file=sys.stderr)
         return 1

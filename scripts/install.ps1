@@ -17,7 +17,7 @@ if (-not $DestinationRoot) {
 }
 $destinationRootFull = [IO.Path]::GetFullPath($DestinationRoot)
 $destination = Join-Path $destinationRootFull $skillName
-$copyItems = @('SKILL.md', 'agents', 'profiles', 'references', 'scripts')
+$copyItems = @('SKILL.md', 'VERSION', 'agents', 'profiles', 'references', 'scripts')
 
 foreach ($item in $copyItems) {
     if (-not (Test-Path -LiteralPath (Join-Path $source $item))) {

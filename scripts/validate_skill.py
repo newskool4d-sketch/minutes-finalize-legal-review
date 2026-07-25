@@ -40,6 +40,8 @@ def main() -> int:
         "references/output-schema.md",
         "scripts/apply_approved_edits.py",
         "scripts/prepare_redactions.py",
+        "scripts/render_legal_review_report.py",
+        "scripts/validate_operation_metrics.py",
         "scripts/verify_release_pair.py",
     ]
     for relative in required:
@@ -58,6 +60,8 @@ def main() -> int:
     target = f"skills\\\\{SKILL_NAME}"
     if readme.count(target) != 2:
         fail("README 설치 경로가 Codex·Claude 모두 실제 스킬명과 일치하지 않습니다.")
+    if f"- 스킬 버전: `{version}`" not in readme:
+        fail("README 스킬 버전이 VERSION과 일치하지 않습니다.")
 
     print("OK: repository skill structure")
     return 0

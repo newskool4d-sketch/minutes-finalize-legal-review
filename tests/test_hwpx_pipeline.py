@@ -23,10 +23,11 @@ def run(*arguments: str, cwd: Path) -> subprocess.CompletedProcess[str]:
     )
 
 
-def synthetic_hwpx(path: Path) -> None:
+def synthetic_hwpx(path: Path, label: str = "기본") -> None:
     section = """<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <hp:section xmlns:hp=\"http://www.hancom.co.kr/hwpml/2011/paragraph\">
   <hp:p><hp:run><hp:t>위원1(위원장) 홍길동</hp:t></hp:run></hp:p>
+  <hp:p><hp:run><hp:t>합성 검증 사례: {label}</hp:t></hp:run></hp:p>
   <hp:p><hp:run><hp:t>위원 홍길동은 오타라고 진술함.</hp:t></hp:run></hp:p>
   <hp:tbl><hp:tr><hp:tc><hp:subList><hp:p><hp:run><hp:t>표결 3명 찬성</hp:t></hp:run></hp:p></hp:subList></hp:tc></hp:tr></hp:tbl>
 </hp:section>""".encode("utf-8")
@@ -40,6 +41,15 @@ def synthetic_hwpx(path: Path) -> None:
 
 
 class HwpxPipelineTests(unittest.TestCase):
+    def test_validates_five_distinct_synthetic_hwpx_packages(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            work = Path(directory)
+            for number in range(1, 6):
+                source = work / f"synthetic-{number}.hwpx"
+                synthetic_hwpx(source, f"사례-{number}")
+                result = run(str(SCRIPTS / "inspect_hwpx.py"), str(source), cwd=ROOT)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_prepares_role_context_redactions_without_printing_values(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             work = Path(directory)

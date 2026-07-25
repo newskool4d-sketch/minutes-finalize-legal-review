@@ -2,7 +2,7 @@
 
 HWPX 회의록의 1차 수정본을 2차 정본으로 정리하면서, 발언별 법률·절차 위험과 근거자료를 함께 검토하는 범용 스킬입니다.
 
-- 스킬 버전: `0.2.0`
+- 스킬 버전: `0.3.0`
 - 지원 환경: Windows PowerShell 5.1 이상, Python 3.10 이상(표준 라이브러리만 사용)
 - 법령 프로필: 사건별 시행일 확인이 필요하며, 최종 확인일은 각 프로필에 별도로 기록합니다.
 
@@ -38,6 +38,8 @@ Copy-Item "$source\\SKILL.md" "$target\\SKILL.md" -Force
 Copy-Item "$source\\agents" "$target" -Recurse -Force
 Copy-Item "$source\\references" "$target" -Recurse -Force
 Copy-Item "$source\\profiles" "$target" -Recurse -Force
+Copy-Item "$source\\scripts" "$target" -Recurse -Force
+Copy-Item "$source\\VERSION" "$target\\VERSION" -Force
 ```
 
 설치 후 Codex를 새로 시작하면 스킬 목록에서 `minutes-hwpx-finalize-legal-review`를 사용할 수 있습니다.
@@ -61,6 +63,9 @@ New-Item -ItemType Directory -Force -Path $target | Out-Null
 Copy-Item "$source\\SKILL.md" "$target\\SKILL.md" -Force
 Copy-Item "$source\\references" "$target" -Recurse -Force
 Copy-Item "$source\\profiles" "$target" -Recurse -Force
+Copy-Item "$source\\agents" "$target" -Recurse -Force
+Copy-Item "$source\\scripts" "$target" -Recurse -Force
+Copy-Item "$source\\VERSION" "$target\\VERSION" -Force
 ```
 
 Claude Code를 새로 시작한 후 다음과 같이 요청합니다.
@@ -83,6 +88,17 @@ Claude Code 자동 설치는 `-Target Claude`를 사용합니다.
 2. 업무 관할에 맞는 `profiles/` 파일을 선택합니다.
 3. 1차 수정본 HWPX와 시나리오를 입력합니다.
 4. 결재용 실명 정본 HWPX, 정보공개 청구용 비실명 HWPX, 법률위험 검토표를 별도로 생성합니다.
+
+법률위험 검토표는 실명·사건번호를 넣지 않은 JSON을 준비한 뒤 다음과 같이 생성합니다. 높은 위험 항목에 사실 요지·확인 자료·시점이 기록된 공식 근거·`L 법무 확인`이 없으면 파일이 생성되지 않습니다.
+
+```powershell
+py -X utf8 scripts\render_legal_review_report.py .\case-data\review.json `
+  --output .\case-data\법률위험_검토표.md
+```
+
+입력 필드 형식은 [출력 스키마](references/output-schema.md)를 따릅니다. 이 명령은 회의록 HWPX를 읽거나 외부 MCP로 전송하지 않으며, 검토자가 별도로 작성한 비식별 기록만 렌더링합니다.
+
+시범 운영에서는 [운영 성과지표](references/operation-metrics.md)에 주무관·담당 장학사 검토시간과 비식별 반려 사유 코드를 기록합니다.
 5. 사람이 승인한 변경만 결재용 실명 정본에 반영하고, 승인된 비실명 처리만 정보공개 청구용 HWPX에 적용합니다.
 
 전사 원본이 없는 경우에도 사용할 수 있습니다. 이때는 전사 누락 여부를 판단하지 않고 1차 수정본의 정본화·법률위험 검토만 수행합니다.

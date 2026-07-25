@@ -31,6 +31,16 @@
 py -X utf8 scripts\validate_operation_metrics.py .\case-data\operation-metrics.json
 ```
 
+3건 이상 누적되면 개인·사건 식별자나 회의록 내용 없이 집계합니다.
+
+```powershell
+py -X utf8 scripts\summarize_pilot_metrics.py `
+  .\case-data\metric-001.json .\case-data\metric-002.json .\case-data\metric-003.json `
+  --output .\case-data\pilot-summary.json
+```
+
+집계 결과에는 건수, 시간 절감률, 제안 수용·반려율, 한글 열기·구조 실패 건수, 사람이 발견한 누락 수, 비식별 반려 사유 코드만 들어갑니다. `case_token`은 중복 확인에만 쓰고 출력에는 포함하지 않습니다.
+
 ## 활용 기준
 
 - 3~5건 시범 적용 후 승인률·반려 사유·치명적 누락을 검토한다.

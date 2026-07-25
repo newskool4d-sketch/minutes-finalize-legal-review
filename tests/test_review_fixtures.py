@@ -135,6 +135,33 @@ class ReviewFixtureTests(unittest.TestCase):
             rejected = subprocess.run([sys.executable, str(METRICS), str(source)], capture_output=True, text=True, encoding="utf-8", errors="replace")
             self.assertNotEqual(rejected.returncode, 0)
 
+    def test_pilot_metric_summary_requires_three_and_excludes_case_tokens(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            work = Path(temp)
+            base = {
+                "pages": 30, "review_minutes_before": 120, "review_minutes_after": 60,
+                "officer_review_minutes": 35, "supervisor_review_minutes": 25,
+                "ai_suggestions": 10, "approved_suggestions": 7, "rejected_suggestions": 3,
+                "rejection_reason_codes": ["근거부족"], "high_risk_items": 1,
+                "legal_confirmation_items": 1, "human_found_omissions": 0,
+                "metadata_or_vote_errors": 0, "hwpx_structure_pass": True, "hancom_open_pass": True,
+            }
+            paths = []
+            for number in range(1, 4):
+                path = work / f"metric-{number}.json"
+                path.write_text(json.dumps(base | {"case_token": f"pilot-{number}"}, ensure_ascii=False), encoding="utf-8")
+                paths.append(path)
+            summary = work / "summary.json"
+            script = ROOT / "scripts" / "summarize_pilot_metrics.py"
+            result = subprocess.run(
+                [sys.executable, str(script), *(str(path) for path in paths), "--output", str(summary)],
+                cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            output = summary.read_text(encoding="utf-8")
+            self.assertIn('"case_count": 3', output)
+            self.assertNotIn("pilot-1", output)
+
     def test_candidate_template_keeps_text_out_and_requires_human_completion(self) -> None:
         candidates = {
             "source_document_hash": "a" * 64,

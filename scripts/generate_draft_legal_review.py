@@ -21,12 +21,14 @@ from hwpx_common import read_json, write_json
 LAW_SOURCE = "https://www.law.go.kr/"
 
 
-def basis(law_name: str, article: str, effective_date: str, reference_date: str, status: str) -> dict[str, str]:
+def basis(law_name: str, article: str, effective_date: str, reference_date: str, event_date: str, status: str) -> dict[str, str]:
     return {
+        "jurisdiction": "대한민국",
         "law_name": law_name,
         "article": article,
+        "promulgation_date": "미확인",
         "effective_date": effective_date,
-        "applicable_event_date": reference_date,
+        "applicable_event_date": event_date,
         "retrieved_at": reference_date,
         "source_type": "국가법령정보센터",
         "source_id": LAW_SOURCE,
@@ -34,9 +36,9 @@ def basis(law_name: str, article: str, effective_date: str, reference_date: str,
     }
 
 
-def draft_for(rule: str, reference_date: str) -> dict[str, Any]:
-    procedure_basis = basis("교원의 지위 향상 및 교육활동 보호를 위한 특별법", "제25조", "2026-02-19", reference_date, "시점확인필요")
-    privacy_basis = basis("개인정보 보호법", "제23조", "2025-10-02", reference_date, "시점확인필요")
+def draft_for(rule: str, reference_date: str, event_date: str) -> dict[str, Any]:
+    procedure_basis = basis("교원의 지위 향상 및 교육활동 보호를 위한 특별법", "제25조", "2026-02-19", reference_date, event_date, "시점확인필요")
+    privacy_basis = basis("개인정보 보호법", "제23조", "2025-10-02", reference_date, event_date, "시점확인필요")
     common = {
         "speaker_role": "회의록상 발언자·진술자 및 발언 성격 확인 필요",
         "source_level": "E5",
@@ -150,7 +152,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("template", type=Path, help="prepare_legal_review_template.py 출력 JSON")
     parser.add_argument("--output", required=True, type=Path, help="새 초안 JSON")
-    parser.add_argument("--reference-date", default=dt.date.today().isoformat(), help="사건일 미확인 시 임시 검토 기준일 YYYY-MM-DD")
+    parser.add_argument("--reference-date", default=dt.date.today().isoformat(), help="법령 조회·검토 기준일 YYYY-MM-DD")
+    parser.add_argument("--event-date", default="미확인", help="사건 발생일 YYYY-MM-DD; 모르면 기본값 미확인")
     args = parser.parse_args()
     try:
         if args.output.exists():
@@ -166,18 +169,27 @@ def main() -> int:
             rule = item.get("candidate_rule")
             if not isinstance(rule, str):
                 raise ValueError("candidate_rule이 필요합니다.")
-            draft = draft_for(rule, args.reference_date)
+            draft = draft_for(rule, args.reference_date, args.event_date)
             completed = item | draft
             adjust_location(completed)
             result.append(completed)
-        case = case | {"reviewer_role": "AI 보조 초안 — 담당자·법무 확인 전"}
+        event_dates = case.get("event_dates") if isinstance(case.get("event_dates"), dict) else {}
+        case = case | {
+            "reviewer_role": "AI 보조 초안 — 담당자·법무 확인 전",
+            "event_dates": {
+                "event_date": args.event_date,
+                "hearing_date": event_dates.get("hearing_date", "미확인"),
+                "disposition_date": event_dates.get("disposition_date", "미확인"),
+                "minutes_finalized_date": event_dates.get("minutes_finalized_date", "미확인"),
+            },
+        }
         write_json(args.output, {
             "case": case,
             "issues": result,
             "note": "후보별 초안입니다. 사건·심의일과 당시 시행 법령, 사실·증거·정보공개 사유를 담당자 또는 법무가 확인하기 전에는 결재·공개본 수정 근거로 사용할 수 없습니다.",
             "draft_limitations": {
                 "reference_date": args.reference_date,
-                "reference_date_note": "사건일을 아직 받지 못해 임시 검토 기준일을 법령 시점 확인 필드에 넣었습니다. 확정 전 실제 사건·심의일로 교체해야 합니다.",
+                "reference_date_note": "사건일이 미확인이면 법령 근거의 applicable_event_date에도 미확인으로 남깁니다. 실제 사건·심의일을 확인한 뒤에만 해당 날짜로 교체하십시오.",
                 "source_text": "원문·실명·직접 인용을 출력에 포함하지 않았습니다.",
             },
         })

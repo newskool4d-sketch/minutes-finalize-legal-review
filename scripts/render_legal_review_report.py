@@ -23,6 +23,7 @@ CONFIDENCE = {"충분", "부분", "부족"}
 SCOPES = {"결재용", "정보공개청구용", "양쪽"}
 APPROVALS = {"미검토", "담당자 승인", "수정 반영", "법무 확인", "반려", "정보공개 담당 확인"}
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+DATE_OR_UNKNOWN = re.compile(r"^(\d{4}-\d{2}-\d{2}|미확인)$")
 
 
 def fail(message: str) -> None:
@@ -44,13 +45,17 @@ def require_list(record: dict[str, Any], field: str, issue_id: str) -> list[Any]
 
 
 def validate_basis(basis: dict[str, Any], issue_id: str) -> None:
-    for field in ("law_name", "article", "effective_date", "applicable_event_date", "retrieved_at", "source_type", "source_id", "verification_status"):
+    for field in ("jurisdiction", "law_name", "article", "promulgation_date", "effective_date", "applicable_event_date", "retrieved_at", "source_type", "source_id", "verification_status"):
         require_string(basis, field, issue_id)
-    for field in ("effective_date", "applicable_event_date", "retrieved_at"):
-        if not DATE.fullmatch(str(basis[field])):
-            fail(f"{issue_id}: {field}은 YYYY-MM-DD 형식이어야 합니다.")
+    for field in ("promulgation_date", "effective_date", "applicable_event_date"):
+        if not DATE_OR_UNKNOWN.fullmatch(str(basis[field])):
+            fail(f"{issue_id}: {field}은 YYYY-MM-DD 또는 미확인이어야 합니다.")
+    if not DATE.fullmatch(str(basis["retrieved_at"])):
+        fail(f"{issue_id}: retrieved_at은 YYYY-MM-DD 형식이어야 합니다.")
     if basis["verification_status"] not in {"원문확인", "시점확인필요", "법무확인필요"}:
         fail(f"{issue_id}: 알 수 없는 verification_status입니다.")
+    if any(basis[field] == "미확인" for field in ("promulgation_date", "effective_date", "applicable_event_date")) and basis["verification_status"] == "원문확인":
+        fail(f"{issue_id}: 시점 정보가 미확인이면 원문확인으로 확정할 수 없습니다.")
 
 
 def validate_issue(issue: dict[str, Any]) -> None:
@@ -94,6 +99,13 @@ def validate_payload(payload: Any) -> tuple[dict[str, Any], list[dict[str, Any]]
         require_string(case, field, "case")
     if not DATE.fullmatch(str(case["reviewed_at"])):
         fail("case.reviewed_at은 YYYY-MM-DD 형식이어야 합니다.")
+    event_dates = case.get("event_dates")
+    if not isinstance(event_dates, dict):
+        fail("case.event_dates 객체가 필요합니다.")
+    for field in ("event_date", "hearing_date", "disposition_date", "minutes_finalized_date"):
+        value = event_dates.get(field)
+        if not isinstance(value, str) or not DATE_OR_UNKNOWN.fullmatch(value):
+            fail(f"case.event_dates.{field}은 YYYY-MM-DD 또는 미확인이어야 합니다.")
     if not isinstance(issues, list) or not issues:
         fail("issues는 비어 있지 않은 배열이어야 합니다.")
     ids: set[str] = set()
@@ -122,6 +134,8 @@ def render(case: dict[str, Any], issues: list[dict[str, Any]]) -> str:
         f"- 내부 식별자: `{cell(case['case_token'])}`",
         f"- 검토일: {cell(case['reviewed_at'])}",
         f"- 검토 역할: {cell(case['reviewer_role'])}",
+        f"- 사건일: {cell(case['event_dates']['event_date'])}",
+        f"- 심의일: {cell(case['event_dates']['hearing_date'])}",
         f"- 입력본 해시: `{cell(case['source_document_hash'])}`",
         "",
         "| ID | 위치 | 쟁점 | 위험 | 조치 | 적용 범위 | 자료 충족도 | 승인 상태 |",
@@ -145,7 +159,7 @@ def render(case: dict[str, Any], issues: list[dict[str, Any]]) -> str:
             f"- 확인 자료: {cell(issue['evidence_to_check'])}",
             f"- 반대 자료: {cell(issue.get('counterevidence', ['미확인']))}",
             f"- 제안: {cell(issue['suggested_wording'])}",
-            "- 근거: " + "; ".join(f"{cell(item['law_name'])} {cell(item['article'])} (시행 {cell(item['effective_date'])}, 사건 기준 {cell(item['applicable_event_date'])}, {cell(item['verification_status'])})" for item in basis),
+            "- 근거: " + "; ".join(f"{cell(item['jurisdiction'])} {cell(item['law_name'])} {cell(item['article'])} (공포 {cell(item['promulgation_date'])}, 시행 {cell(item['effective_date'])}, 사건 기준 {cell(item['applicable_event_date'])}, {cell(item['verification_status'])})" for item in basis),
             "",
         ])
     return "\n".join(lines)

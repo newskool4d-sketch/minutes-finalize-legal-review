@@ -29,6 +29,7 @@ def synthetic_hwpx(path: Path, label: str = "기본") -> None:
   <hp:p><hp:run><hp:t>위원1(위원장) 홍길동</hp:t></hp:run></hp:p>
   <hp:p><hp:run><hp:t>합성 검증 사례: {label}</hp:t></hp:run></hp:p>
   <hp:p><hp:run><hp:t>위원 홍길동은 오타라고 진술함.</hp:t></hp:run></hp:p>
+  <hp:linesegarray/>
   <hp:tbl><hp:tr><hp:tc><hp:subList><hp:p><hp:run><hp:t>표결 3명 찬성</hp:t></hp:run></hp:p></hp:subList></hp:tc></hp:tr></hp:tbl>
 </hp:section>""".encode("utf-8")
     header = b'<?xml version="1.0" encoding="UTF-8"?><hh:head xmlns:hh="urn:test"/>'
@@ -295,9 +296,11 @@ class HwpxPipelineTests(unittest.TestCase):
             self.assertIn("홍길동", approval_text)
             self.assertNotIn("○○", approval_text)
             self.assertIn("정정", approval_text)
+            self.assertNotIn("hp:linesegarray", approval_text)
             self.assertIn("○○", disclosure_text)
             self.assertNotIn("홍길동", disclosure_text)
             self.assertIn("정정", disclosure_text)
+            self.assertNotIn("hp:linesegarray", disclosure_text)
 
             ledger_text = ledger.read_text(encoding="utf-8")
             self.assertNotIn("홍길동", ledger_text)

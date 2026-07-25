@@ -14,6 +14,7 @@ from xml.etree import ElementTree as ET
 
 HWPX_MIMETYPE = b"application/hwp+zip"
 TEXT_ELEMENT = re.compile(r"(<hp:t\b[^>]*>)(.*?)(</hp:t>)", re.DOTALL)
+LINESEG_ARRAY = re.compile(rb"<hp:linesegarray\b[^>]*(?:/>|>.*?</hp:linesegarray>)", re.DOTALL)
 OPEN_PARAGRAPH_TAG = re.compile(rb"<(?:[A-Za-z_][\w.-]*:)?p\b[^>]*>")
 CLOSE_PARAGRAPH_TAG = re.compile(rb"</(?:[A-Za-z_][\w.-]*:)?p\s*>")
 
@@ -136,6 +137,16 @@ def replace_text_nodes(xml_bytes: bytes, source: str, replacement: str) -> tuple
 
     pattern = re.compile(TEXT_ELEMENT.pattern.encode("ascii"), re.DOTALL)
     return pattern.sub(replace_match, xml_bytes), changed
+
+
+def strip_stale_linesegarrays(xml_bytes: bytes) -> tuple[bytes, int]:
+    """Remove cached line-layout arrays after changing text in an HWPX section.
+
+    Hancom regenerates these caches when the file opens.  Keeping a cache that
+    was calculated for different text can make an otherwise well-formed HWPX
+    fail its real-application open gate.
+    """
+    return LINESEG_ARRAY.subn(b"", xml_bytes)
 
 
 def replace_paragraph_text(xml_bytes: bytes, paragraph_number: int, source: str, replacement: str) -> tuple[bytes, int]:

@@ -61,10 +61,16 @@ def main() -> int:
             args.output,
             {
                 "case": {
-                    "case_token": args.case_token,
-                    "reviewed_at": args.reviewed_at,
-                    "reviewer_role": "[실무자 지정 필요]",
-                    "source_document_hash": document_hash,
+                "case_token": args.case_token,
+                "reviewed_at": args.reviewed_at,
+                "reviewer_role": "[실무자 지정 필요]",
+                "source_document_hash": document_hash,
+                "event_dates": {
+                    "event_date": "미확인",
+                    "hearing_date": "미확인",
+                    "disposition_date": "미확인",
+                    "minutes_finalized_date": "미확인",
+                },
                 },
                 "issues": issues,
                 "note": "후보 위치·해시만 옮긴 미완성 템플릿입니다. 원문·실명은 포함하지 않으며, 작성 후 render_legal_review_report.py로 검증합니다.",

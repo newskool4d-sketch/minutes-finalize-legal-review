@@ -22,10 +22,12 @@
   "reasoning_summary": "발언 요지와 확인된 자료가 절차·사실인정 쟁점으로 연결되는 이유",
   "legal_basis": [
     {
+      "jurisdiction": "대한민국",
       "law_name": "법령명",
       "article": "제N조",
+      "promulgation_date": "YYYY-MM-DD|미확인",
       "effective_date": "YYYY-MM-DD",
-      "applicable_event_date": "YYYY-MM-DD",
+      "applicable_event_date": "YYYY-MM-DD|미확인",
       "retrieved_at": "YYYY-MM-DD",
       "source_type": "법령|고시|판례|재결례|내부규정",
       "source_id": "공식 URL 또는 식별자",
@@ -80,6 +82,8 @@
 - `V`: 근거 확인
 
 `문장 비공개`는 정보공개 청구용에만 쓴다. `location`, `reason`, `human_decision`과 `min_matches: 1`, `max_matches: 1`을 모두 기록하고 결재용 실명 정본에는 원문을 유지한다.
+
+법령의 공포일·시행일·사건 기준일은 서로 다른 필드다. 아직 확인하지 못한 공포일·사건 기준일은 임의 날짜를 넣지 않고 `미확인`으로 기록하며, 이 경우 `verification_status`는 `시점확인필요` 또는 `법무확인필요`여야 한다.
 
 ## 검토표 생성 전제
 

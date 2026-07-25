@@ -64,6 +64,7 @@ class ReviewFixtureTests(unittest.TestCase):
             payload = json.loads(draft.read_text(encoding="utf-8"))
             self.assertEqual(payload["issues"][0]["approval_status"], "미검토")
             self.assertEqual(payload["issues"][0]["action_code"], "L")
+            self.assertEqual(payload["case"]["event_dates"]["event_date"], "미확인")
             self.assertNotIn("홍길동", json.dumps(payload, ensure_ascii=False))
 
     def test_fixture_has_ten_unique_high_value_cases(self) -> None:
@@ -83,7 +84,7 @@ class ReviewFixtureTests(unittest.TestCase):
 
     def test_high_risk_review_requires_evidence_and_renders_without_case_text(self) -> None:
         payload = {
-            "case": {"case_token": "synthetic-001", "reviewed_at": "2026-07-25", "reviewer_role": "담당 장학사", "source_document_hash": "a" * 64},
+            "case": {"case_token": "synthetic-001", "reviewed_at": "2026-07-25", "reviewer_role": "담당 장학사", "source_document_hash": "a" * 64, "event_dates": {"event_date": "2026-01-01", "hearing_date": "2026-01-02", "disposition_date": "미확인", "minutes_finalized_date": "미확인"}},
             "issues": [{
                 "issue_id": "issue-001", "location": "section-1/paragraph-2", "location_id": "section-1/paragraph-2",
                 "speaker_role": "위원", "statement_summary": "공식 자료 없는 민감정보 추정 발언", "statement_text_hash": "b" * 64,
@@ -91,7 +92,7 @@ class ReviewFixtureTests(unittest.TestCase):
                 "risk_type": ["민감정보", "추측"], "risk_level": "높음", "action_code": "L",
                 "suggested_wording": "사실확정 없이 기록하지 않고 출처를 확인함.", "evidence_to_check": ["회의자료"],
                 "counterevidence": ["의료 서면 미확인"], "reasoning_summary": "추정만으로 민감정보를 심의 근거로 쓰면 사실인정과 개인정보 쟁점이 생김.",
-                "legal_basis": [{"law_name": "합성 법령", "article": "제1조", "effective_date": "2025-01-01", "applicable_event_date": "2026-01-01", "retrieved_at": "2026-07-25", "source_type": "법령", "source_id": "https://example.invalid/law", "verification_status": "법무확인필요"}],
+                "legal_basis": [{"jurisdiction": "대한민국", "law_name": "합성 법령", "article": "제1조", "promulgation_date": "2024-01-01", "effective_date": "2025-01-01", "applicable_event_date": "2026-01-01", "retrieved_at": "2026-07-25", "source_type": "법령", "source_id": "https://example.invalid/law", "verification_status": "법무확인필요"}],
                 "recommended_scope": "결재용", "confidence": "부족", "approval_status": "법무 확인",
             }],
         }

@@ -19,6 +19,7 @@ from hwpx_common import (
     replace_paragraph_text,
     section_names,
     sha256_file,
+    strip_stale_linesegarrays,
     validate_basic_hwpx,
     write_json,
     write_preserving_zip,
@@ -113,6 +114,15 @@ def apply_records(
     return updated, audit
 
 
+def strip_layout_caches(entries: dict[str, bytes], section_files: list[str]) -> tuple[dict[str, bytes], int]:
+    updated = dict(entries)
+    stripped = 0
+    for filename in section_files:
+        updated[filename], count = strip_stale_linesegarrays(updated[filename])
+        stripped += count
+    return updated, stripped
+
+
 def public_ledger(redactions: list[dict[str, Any]], audit: list[dict[str, Any]]) -> list[dict[str, Any]]:
     counts = {str(item["id"]): item["changed_count"] for item in audit}
     return [
@@ -191,6 +201,8 @@ def main() -> int:
         disclosure_entries, disclosure_audit = apply_records(
             entries, sections, disclosure_edits + disclosure_redactions, "정보공개 청구용"
         )
+        approval_entries, approval_layout_caches = strip_layout_caches(approval_entries, sections)
+        disclosure_entries, disclosure_layout_caches = strip_layout_caches(disclosure_entries, sections)
         write_preserving_zip(args.approval_output, infos, approval_entries)
         write_preserving_zip(args.disclosure_output, infos, disclosure_entries)
         approval_validation = validate_basic_hwpx(args.approval_output)
@@ -204,6 +216,10 @@ def main() -> int:
                 "disclosure_output": {"path": str(args.disclosure_output), "sha256": disclosure_validation["sha256"]},
                 "approval_changes": approval_audit,
                 "disclosure_changes": disclosure_audit,
+                "layout_cache": {
+                    "approval_stripped_linesegarrays": approval_layout_caches,
+                    "disclosure_stripped_linesegarrays": disclosure_layout_caches,
+                },
                 "note": "원문과 직접식별정보는 이 변경이력에 저장하지 않습니다.",
             },
         )

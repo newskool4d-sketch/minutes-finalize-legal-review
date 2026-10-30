@@ -1,55 +1,27 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidateSet('Codex', 'Claude')]
     [string]$Target = 'Codex',
-    [string]$DestinationRoot
+    [string]$DestinationRoot,
+    [string]$SourceRoot
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'deployment_common.ps1')
 
-$skillName = 'minutes-hwpx-finalize-legal-review'
-if (-not $DestinationRoot) {
-    $base = if ($Target -eq 'Codex') { '.codex\skills' } else { '.claude\skills' }
-    $DestinationRoot = Join-Path $env:USERPROFILE $base
+$selfRoot = Get-FullDeploymentPath (Join-Path $PSScriptRoot '..')
+if (-not $SourceRoot) {
+    if (Test-Path -LiteralPath (Join-Path $selfRoot $script:MinutesManifestName)) {
+        throw '설치본 내부에서 검증할 때는 신뢰할 수 있는 별도 소스의 -SourceRoot를 명시하십시오.'
+    }
+    $SourceRoot = $selfRoot
 }
-$destination = Join-Path ([IO.Path]::GetFullPath($DestinationRoot)) $skillName
-$required = @(
-    'SKILL.md',
-    'VERSION',
-    'agents\openai.yaml',
-    'profiles\README.md',
-    'references\checklist.md',
-    'scripts\apply_approved_edits.py',
-    'scripts\validate_hwpx.py',
-    'scripts\verify_release_pair.py',
-    'scripts\detect_legal_review_candidates.py',
-    'scripts\prepare_legal_review_template.py',
-    'scripts\generate_draft_legal_review.py',
-    'scripts\render_legal_review_report.py',
-    'scripts\validate_operation_metrics.py'
-)
-$missing = @($required | Where-Object { -not (Test-Path -LiteralPath (Join-Path $destination $_)) })
-$name = ''
-$version = ''
-if (Test-Path -LiteralPath (Join-Path $destination 'SKILL.md')) {
-    $nameLine = Get-Content -LiteralPath (Join-Path $destination 'SKILL.md') | Where-Object { $_ -match '^name:\s*' } | Select-Object -First 1
-    if ($nameLine) { $name = ($nameLine -replace '^name:\s*', '').Trim() }
-}
-if (Test-Path -LiteralPath (Join-Path $destination 'VERSION')) {
-    $version = (Get-Content -Raw -LiteralPath (Join-Path $destination 'VERSION')).Trim()
-}
-
-$result = [pscustomobject]@{
-    target = $Target
-    path = $destination
-    exists = Test-Path -LiteralPath $destination
-    skill_name = $name
-    skill_name_matches = ($name -eq $skillName)
-    version = $version
-    version_valid = ($version -match '^\d+\.\d+\.\d+$')
-    missing = $missing
-    valid = ((Test-Path -LiteralPath $destination) -and $name -eq $skillName -and $version -match '^\d+\.\d+\.\d+$' -and $missing.Count -eq 0)
-}
-$result | ConvertTo-Json -Depth 3
+$source = Get-FullDeploymentPath $SourceRoot
+$dest = Get-DeploymentDestination $Target $DestinationRoot
+Assert-DeploymentSeparation $source $dest.Root $dest.Storage
+$entries = @(Get-DistributionEntries $source)
+$result = Test-DeploymentInstallation $dest.Path $source $entries
+$result | Add-Member -NotePropertyName target -NotePropertyValue $Target
+$result | ConvertTo-Json -Depth 6
 if (-not $result.valid) { exit 1 }

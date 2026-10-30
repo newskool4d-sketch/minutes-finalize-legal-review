@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-import html
 import hashlib
 import json
 import re
@@ -12,11 +11,10 @@ from pathlib import Path
 from typing import Any, Iterable
 from xml.etree import ElementTree as ET
 
+from hwpx_locations import replace_in_paragraphs, validate_location_id
+
 HWPX_MIMETYPE = b"application/hwp+zip"
-TEXT_ELEMENT = re.compile(r"(<hp:t\b[^>]*>)(.*?)(</hp:t>)", re.DOTALL)
 LINESEG_ARRAY = re.compile(rb"<hp:linesegarray\b[^>]*(?:/>|>.*?</hp:linesegarray>)", re.DOTALL)
-OPEN_PARAGRAPH_TAG = re.compile(rb"<(?:[A-Za-z_][\w.-]*:)?p\b[^>]*>")
-CLOSE_PARAGRAPH_TAG = re.compile(rb"</(?:[A-Za-z_][\w.-]*:)?p\s*>")
 
 
 def sha256_file(path: Path) -> str:
@@ -120,23 +118,12 @@ def count_structure(xml_bytes: bytes) -> dict[str, int]:
     return counts
 
 
-def replace_text_nodes(xml_bytes: bytes, source: str, replacement: str) -> tuple[bytes, int]:
-    """Replace literal text only inside hp:t elements, preserving surrounding XML bytes."""
-    source_xml = _escape_xml_text(source)
-    replacement_xml = _escape_xml_text(replacement)
-    changed = 0
-
-    def replace_match(match: re.Match[bytes]) -> bytes:
-        nonlocal changed
-        body = match.group(2)
-        occurrences = body.count(source_xml)
-        if occurrences:
-            changed += occurrences
-            body = body.replace(source_xml, replacement_xml)
-        return match.group(1) + body + match.group(3)
-
-    pattern = re.compile(TEXT_ELEMENT.pattern.encode("ascii"), re.DOTALL)
-    return pattern.sub(replace_match, xml_bytes), changed
+def replace_text_nodes(
+    xml_bytes: bytes, source: str, replacement: str, *,
+    location_id: str | None = None, section_index: int = 0,
+) -> tuple[bytes, int]:
+    """Replace own paragraph text across runs, retaining all surrounding bytes."""
+    return replace_in_paragraphs(xml_bytes, section_index, source, replacement, location_id=location_id)
 
 
 def strip_stale_linesegarrays(xml_bytes: bytes) -> tuple[bytes, int]:
@@ -149,56 +136,11 @@ def strip_stale_linesegarrays(xml_bytes: bytes) -> tuple[bytes, int]:
     return LINESEG_ARRAY.subn(b"", xml_bytes)
 
 
-def replace_paragraph_text(xml_bytes: bytes, paragraph_number: int, source: str, replacement: str) -> tuple[bytes, int]:
-    """Replace one whole HWPX paragraph while preserving its XML tags and runs.
-
-    A sentence may be split across several ``hp:t`` nodes.  This function uses a
-    structural paragraph ordinal plus an exact concatenated-text check, then
-    puts the replacement in the first text node and clears the remaining nodes.
-    """
-    if paragraph_number < 1:
-        raise ValueError("paragraph_number는 1 이상이어야 합니다.")
-    seen = 0
-    start: int | None = None
-    end: int | None = None
-    for match in OPEN_PARAGRAPH_TAG.finditer(xml_bytes):
-        seen += 1
-        if seen != paragraph_number:
-            continue
-        start = match.start()
-        if match.group(0).rstrip().endswith(b"/>"):
-            end = match.end()
-        else:
-            close = CLOSE_PARAGRAPH_TAG.search(xml_bytes, match.end())
-            if close:
-                end = close.end()
-        break
-    if start is None or end is None:
-        return xml_bytes, 0
-    paragraph = xml_bytes[start:end]
-    pattern = re.compile(TEXT_ELEMENT.pattern.encode("ascii"), re.DOTALL)
-    matches = list(pattern.finditer(paragraph))
-    if not matches:
-        return xml_bytes, 0
-    actual = "".join(html.unescape(match.group(2).decode("utf-8")) for match in matches).strip()
-    if actual != source:
-        return xml_bytes, 0
-    replacement_xml = _escape_xml_text(replacement)
-    rebuilt: list[bytes] = []
-    cursor = 0
-    for index, match in enumerate(matches):
-        rebuilt.append(paragraph[cursor:match.start()])
-        body = replacement_xml if index == 0 else b""
-        rebuilt.append(match.group(1) + body + match.group(3))
-        cursor = match.end()
-    rebuilt.append(paragraph[cursor:])
-    return xml_bytes[:start] + b"".join(rebuilt) + xml_bytes[end:], 1
-
-
-def _escape_xml_text(value: str) -> bytes:
-    return (
-        value.replace("&", "&amp;")
-        .replace("<", "&lt;")
-        .replace(">", "&gt;")
-        .encode("utf-8")
+def replace_paragraph_text(
+    xml_bytes: bytes, location_id: str, source: str, replacement: str, *, section_index: int = 0,
+) -> tuple[bytes, int]:
+    """Replace one canonical paragraph's own text, never any nested paragraph."""
+    validate_location_id(location_id)
+    return replace_in_paragraphs(
+        xml_bytes, section_index, source, replacement, location_id=location_id, whole=True
     )

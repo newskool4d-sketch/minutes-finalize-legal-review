@@ -39,7 +39,13 @@ def main() -> int:
         "examples/pilot-metrics.example.json",
         "references/checklist.md",
         "references/output-schema.md",
+        "references/review-summary.md",
+        "references/storage-boundaries.md",
+        "examples/human-evidence.example.json",
         "scripts/apply_approved_edits.py",
+        "scripts/approval_contract.py",
+        "scripts/hwpx_locations.py",
+        "scripts/disclosure_package.py",
         "scripts/prepare_redactions.py",
         "scripts/detect_legal_review_candidates.py",
         "scripts/prepare_legal_review_template.py",
@@ -52,6 +58,12 @@ def main() -> int:
         "scripts/check_markdown_links.py",
         "scripts/check_powershell_scripts.py",
         "scripts/verify_release_pair.py",
+        "scripts/render_review_summary.py",
+        "distribution-manifest.json",
+        "scripts/deployment_common.ps1",
+        "scripts/install.ps1",
+        "scripts/verify_install.ps1",
+        "scripts/uninstall.ps1",
     ]
     for relative in required:
         if not (ROOT / relative).is_file():
@@ -66,9 +78,11 @@ def main() -> int:
         fail("agents/openai.yaml default_prompt에 스킬 호출명이 없습니다.")
 
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    target = f"skills\\\\{SKILL_NAME}"
-    if readme.count(target) != 2:
-        fail("README 설치 경로가 Codex·Claude 모두 실제 스킬명과 일치하지 않습니다.")
+    normalized_readme = readme.replace("\\\\", "\\")
+    for client in ("codex", "claude"):
+        target = f"%USERPROFILE%\\.{client}\\skills\\{SKILL_NAME}"
+        if normalized_readme.count(target) != 1:
+            fail("README 기본 설치 경로가 Codex·Claude 모두 실제 스킬명과 일치하지 않습니다.")
     if f"- 스킬 버전: `{version}`" not in readme:
         fail("README 스킬 버전이 VERSION과 일치하지 않습니다.")
 

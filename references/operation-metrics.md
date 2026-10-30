@@ -2,7 +2,7 @@
 
 실제 사건 내용·실명·회의록 문구를 기록하지 않고, 심의 단위의 집계 수치만 남긴다.
 
-시작할 때는 [복사형 예시](../examples/pilot-metrics.example.json)를 기관의 비추적 `case-data/` 폴더에 복사하고 숫자·허용된 반려 사유 코드만 채운다.
+시작할 때는 [복사형 예시](../examples/pilot-metrics.example.json)를 저장소·설치 폴더 밖의 기관 승인 작업공간에 복사하고 숫자·허용된 반려 사유 코드만 채운다. 실자료와 달리 비식별 집계만 다루며, 사건별 내부 토큰·집계 전 파일은 기관 접근통제로 관리한다. [저장 경계](storage-boundaries.md)를 따른다.
 
 ## 기록 항목
 
@@ -30,15 +30,16 @@
 반려 사유에는 회의록 문장·실명·자유서술을 넣지 않고 `근거부족`, `사실불일치`, `범위과다`, `표현부적절`, `기관기준확인`, `법무확인`, `기타비식별` 중 코드만 사용한다. 기록 전에는 다음으로 형식을 확인한다.
 
 ```powershell
-py -X utf8 scripts\validate_operation_metrics.py .\case-data\operation-metrics.json
+$metricsRoot = '<기관에서 승인한 repo·설치 폴더 밖 지표 작업공간 절대경로>'
+py -X utf8 scripts\validate_operation_metrics.py "$metricsRoot\operation-metrics.json"
 ```
 
 3건 이상 누적되면 개인·사건 식별자나 회의록 내용 없이 집계합니다.
 
 ```powershell
 py -X utf8 scripts\summarize_pilot_metrics.py `
-  .\case-data\metric-001.json .\case-data\metric-002.json .\case-data\metric-003.json `
-  --output .\case-data\pilot-summary.json
+  "$metricsRoot\metric-001.json" "$metricsRoot\metric-002.json" "$metricsRoot\metric-003.json" `
+  --output "$metricsRoot\pilot-summary.json"
 ```
 
 집계 결과에는 건수, 시간 절감률, 제안 수용·반려율, 한글 열기·구조 실패 건수, 사람이 발견한 누락 수, 비식별 반려 사유 코드만 들어갑니다. `case_token`은 중복 확인에만 쓰고 출력에는 포함하지 않습니다.

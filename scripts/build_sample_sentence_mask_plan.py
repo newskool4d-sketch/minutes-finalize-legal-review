@@ -15,7 +15,9 @@ from xml.etree import ElementTree as ET
 from pathlib import Path
 from typing import Any
 
-from hwpx_common import local_name, read_json, section_names, validate_basic_hwpx, write_json
+from approval_contract import validate_approval_spec, validate_source_contract
+from hwpx_common import read_json, section_names, validate_basic_hwpx, write_json
+from hwpx_locations import LOCATION_SCHEME, parse_section, validate_location_id
 
 
 DECISIONS = {"담당자 승인", "정보공개 담당 확인", "법무 확인"}
@@ -26,13 +28,8 @@ def paragraph_lookup(input_path: Path) -> dict[str, str]:
     lookup: dict[str, str] = {}
     with zipfile.ZipFile(input_path, "r") as archive:
         for section_index, filename in enumerate(section_names(archive.namelist())):
-            root = ET.fromstring(archive.read(filename))
-            paragraph_number = 0
-            for node in root.iter():
-                if local_name(node.tag) != "p":
-                    continue
-                paragraph_number += 1
-                lookup[f"section-{section_index}/paragraph-{paragraph_number}"] = "".join(node.itertext()).strip()
+            for item in parse_section(section_index, archive.read(filename)):
+                lookup[item.location_id] = item.own_text.strip()
     return lookup
 
 
@@ -44,20 +41,26 @@ def main() -> int:
     parser.add_argument("--location", required=True, action="append", help="문장 단위로 가릴 paragraph 위치; 반복 지정 가능")
     parser.add_argument("--reason", required=True, help="정보공개용 문장 비공개 사유")
     parser.add_argument("--decision", required=True, choices=sorted(DECISIONS), help="샘플 작성 승인 상태")
+    parser.add_argument("--decided-by-role", required=True, help="명시적으로 승인한 검토자 역할")
+    parser.add_argument("--decided-at", required=True, help="시간대가 포함된 실제 승인 시각(ISO 8601)")
+    parser.add_argument("--evidence-ref", required=True, action="append", help="원문 없는 scheme:ref-id 근거 참조; 반복 지정 가능")
+    parser.add_argument("--issue-id", required=True, help="문장 비공개 승인이 연결되는 검토 이슈 ID")
     args = parser.parse_args()
     try:
         if args.output.exists():
             raise FileExistsError(f"출력 파일이 이미 존재합니다: {args.output}")
         base = read_json(args.base)
+        validate_source_contract(base, args.input)
         lookup = paragraph_lookup(args.input)
         redactions = base.get("redactions", [])
         edits = base.get("edits", [])
         if not isinstance(redactions, list) or not isinstance(edits, list):
             raise ValueError("기존 계획의 edits/redactions 형식이 올바르지 않습니다.")
         requested = list(dict.fromkeys(args.location))
-        existing_ids = {str(item.get("id")) for item in redactions if isinstance(item, dict)}
+        existing_ids = {str(item.get("id")) for item in edits + redactions}
         additions: list[dict[str, Any]] = []
         for number, location in enumerate(requested, start=1):
+            validate_location_id(location)
             text = lookup.get(location)
             if not isinstance(text, str) or not text.strip():
                 raise ValueError(f"문장 비공개 대상 위치를 찾지 못했습니다: {location}")
@@ -74,16 +77,25 @@ def main() -> int:
                 "redaction_type": "문장 비공개",
                 "reason": args.reason,
                 "human_decision": args.decision,
+                "issue_id": args.issue_id,
+                "decided_by_role": args.decided_by_role,
+                "decided_at": args.decided_at,
+                "evidence_refs": args.evidence_ref,
                 "min_matches": 1,
                 "max_matches": 1,
                 "sample_only": True,
             })
-        write_json(args.output, {
+        plan = {
+            "schema_version": 2,
+            "location_scheme": LOCATION_SCHEME,
+            "source_sha256": base["source_sha256"],
             "edits": edits,
             "redactions": redactions + additions,
             "sample_only": True,
             "sample_note": "사용자 승인에 따른 샘플 산출 전용 계획입니다. 실제 공개·결재 전에는 정보공개 담당자와 법무 검토를 다시 받아야 합니다.",
-        })
+        }
+        validate_approval_spec(plan)
+        write_json(args.output, plan)
     except (OSError, ValueError, KeyError) as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1

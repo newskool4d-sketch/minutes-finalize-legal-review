@@ -8,7 +8,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-SCRIPTS = ("install.ps1", "uninstall.ps1", "verify_install.ps1")
+SCRIPTS = ("install.ps1", "uninstall.ps1", "verify_install.ps1", "deployment_common.ps1")
 
 
 def main() -> int:

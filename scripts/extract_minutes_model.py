@@ -10,63 +10,15 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
-from hwpx_common import local_name, section_names, validate_basic_hwpx, write_json
-
-
-def text_of(node: ET.Element) -> str:
-    return "".join(part for part in node.itertext() if part).strip()
+from hwpx_common import section_names, validate_basic_hwpx, write_json
+from hwpx_locations import LOCATION_SCHEME, parse_section
 
 
 def extract_section(section_index: int, xml_bytes: bytes) -> list[dict[str, Any]]:
-    root = ET.fromstring(xml_bytes)
-    records: list[dict[str, Any]] = []
-    counters = {"paragraph": 0, "table": 0, "row": 0, "cell": 0}
-
-    def walk(node: ET.Element, context: list[str], cell_paragraph: int | None = None) -> None:
-        name = local_name(node.tag)
-        if name == "tbl":
-            counters["table"] += 1
-            table_context = context + [f"table-{counters['table']}"]
-            for child in node:
-                walk(child, table_context)
-            return
-        if name == "tr":
-            counters["row"] += 1
-            row_context = context + [f"row-{counters['row']}"]
-            for child in node:
-                walk(child, row_context)
-            return
-        if name == "tc":
-            counters["cell"] += 1
-            cell_context = context + [f"cell-{counters['cell']}"]
-            local_paragraph = 0
-            for child in node:
-                if local_name(child.tag) == "p":
-                    local_paragraph += 1
-                    walk(child, cell_context, local_paragraph)
-                else:
-                    walk(child, cell_context)
-            return
-        if name == "p":
-            counters["paragraph"] += 1
-            location = [f"section-{section_index}"] + context
-            if cell_paragraph is None:
-                location.append(f"paragraph-{counters['paragraph']}")
-            else:
-                location.append(f"paragraph-{cell_paragraph}")
-            records.append(
-                {
-                    "location_id": "/".join(location),
-                    "paragraph_index": counters["paragraph"],
-                    "text": text_of(node),
-                }
-            )
-            return
-        for child in node:
-            walk(child, context, cell_paragraph)
-
-    walk(root, [])
-    return records
+    return [
+        {"location_id": item.location_id, "paragraph_index": item.paragraph_index, "text": item.own_text.strip()}
+        for item in parse_section(section_index, xml_bytes)
+    ]
 
 
 def main() -> int:
@@ -84,6 +36,7 @@ def main() -> int:
         write_json(
             args.output,
             {
+                "location_scheme": LOCATION_SCHEME,
                 "source": {"path": str(args.input), "sha256": metadata["sha256"]},
                 "paragraphs": records,
                 "note": "원문 텍스트가 포함됩니다. 이 파일은 사건자료와 같은 접근통제로 관리하고 저장소에 커밋하지 마십시오.",

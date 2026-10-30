@@ -27,11 +27,14 @@ class ReviewFixtureTests(unittest.TestCase):
             source, base, output = work / "source.hwpx", work / "base.json", work / "sample.json"
             with zipfile.ZipFile(source, "w") as archive:
                 archive.writestr("mimetype", "application/hwp+zip")
-                archive.writestr("Contents/section0.xml", "<hp:section xmlns:hp=\"urn:test\"><hp:p><hp:run><hp:t>합성 민감 문장</hp:t></hp:run></hp:p></hp:section>")
-            base.write_text(json.dumps({"edits": [], "redactions": []}, ensure_ascii=False), encoding="utf-8")
+                archive.writestr("Contents/section0.xml", "<hp:section xmlns:hp=\"http://www.hancom.co.kr/hwpml/2011/paragraph\"><hp:p><hp:run><hp:t>합성 민감 문장</hp:t></hp:run></hp:p></hp:section>")
+            import hashlib
+            base.write_text(json.dumps({"schema_version": 2, "location_scheme": "structural-v2", "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
+                                        "edits": [], "redactions": []}, ensure_ascii=False), encoding="utf-8")
             script = ROOT / "scripts" / "build_sample_sentence_mask_plan.py"
             result = subprocess.run(
-                [sys.executable, str(script), "--input", str(source), "--base", str(base), "--output", str(output), "--location", "section-0/paragraph-1", "--reason", "합성 사유", "--decision", "담당자 승인"],
+                [sys.executable, str(script), "--input", str(source), "--base", str(base), "--output", str(output), "--location", "section-0/paragraph-1", "--reason", "합성 사유", "--decision", "담당자 승인",
+                 "--decided-by-role", "합성 검토자", "--decided-at", "2026-10-30T09:00:00+09:00", "--evidence-ref", "fixture:synthetic-001", "--issue-id", "synthetic-issue-001"],
                 cwd=ROOT, capture_output=True, text=True, encoding="utf-8", errors="replace",
             )
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -47,6 +50,7 @@ class ReviewFixtureTests(unittest.TestCase):
             template.write_text(
                 json.dumps(
                     {
+                        "location_scheme": "structural-v2",
                         "case": {"case_token": "synthetic", "reviewed_at": "2026-07-25", "reviewer_role": "[실무자 지정 필요]", "source_document_hash": "hash"},
                         "issues": [{
                             "issue_id": "issue-001", "location": "section-0/paragraph-1", "location_id": "section-0/paragraph-1",
@@ -173,6 +177,7 @@ class ReviewFixtureTests(unittest.TestCase):
 
     def test_candidate_template_keeps_text_out_and_requires_human_completion(self) -> None:
         candidates = {
+            "location_scheme": "structural-v2",
             "source_document_hash": "a" * 64,
             "candidates": [{"location_id": "section-0/paragraph-4", "statement_text_hash": "b" * 64,
                             "rule_id": "sensitive-health", "legal_issue_type": ["개인정보"],

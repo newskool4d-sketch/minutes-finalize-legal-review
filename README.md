@@ -6,6 +6,14 @@ HWPX 회의록의 1차 수정본을 2차 정본으로 정리하면서, 발언별
 - 지원 환경: Windows PowerShell 5.1 이상, Python 3.10 이상(표준 라이브러리만 사용)
 - 법령 프로필: 사건별 시행일 확인이 필요하며, 최종 확인일은 각 프로필에 별도로 기록합니다.
 
+### 2026-10-30 작업트리의 1차 개선
+
+정식 버전·릴리스와 별도로, 현재 소스에는 승인 계약 v2와 `structural-v2` 위치 체계가 적용돼 있습니다. 기존 승인 JSON은 검토한 입력본 해시·승인 역할·시각·근거 참조를 채워 다시 승인해야 합니다. 자세한 형식과 재검토 절차는 [HWPX 처리 도구](references/hwpx-tooling.md)를 따릅니다.
+
+공개본은 표준 미리보기를 중립 대체하고 메타데이터 등 비본문을 검사합니다. 이미지·첨부 등 미검사 범위는 별도 표시하며, 기술적인 쌍 검사 통과를 정보공개 승인으로 간주하지 않습니다. 각 1차 과제의 구현·검증 상태는 [개선계획 9절](IMPROVEMENT_PLAN.md#9-차기-개선-실행계획-2026-10-30)에 기록합니다.
+
+같은 소스의 2차 개선(N05·N06)은 공유 배포 목록·복구 가능한 설치와 파일 해시에 결속된 검수요약을 추가합니다. `VERSION`은 `0.4.1`로 유지하며, 이 소스 개선과 별도의 버전 태그·릴리스 발행은 구분합니다.
+
 ## 지원 범위
 
 - 1차 수정본 → 2차 정본 정리
@@ -28,59 +36,56 @@ git clone https://github.com/newskool4d-sketch/minutes-finalize-legal-review.git
 
 ### 2. Codex에 설치
 
-PowerShell에서 저장소 폴더 전체를 Codex 스킬 경로에 복사합니다.
+복제한 저장소 폴더로 이동한 뒤 설치 스크립트를 사용합니다. 기본 설치 경로는 `%USERPROFILE%\.codex\skills\minutes-hwpx-finalize-legal-review`입니다.
 
 ```powershell
-$source = '.\\minutes-finalize-legal-review'
-$target = "$env:USERPROFILE\\.codex\\skills\\minutes-hwpx-finalize-legal-review"
-New-Item -ItemType Directory -Force -Path $target | Out-Null
-Copy-Item "$source\\SKILL.md" "$target\\SKILL.md" -Force
-Copy-Item "$source\\agents" "$target" -Recurse -Force
-Copy-Item "$source\\references" "$target" -Recurse -Force
-Copy-Item "$source\\profiles" "$target" -Recurse -Force
-Copy-Item "$source\\scripts" "$target" -Recurse -Force
-Copy-Item "$source\\VERSION" "$target\\VERSION" -Force
+Set-Location -LiteralPath .\minutes-finalize-legal-review
+$sourceRoot = (Get-Location).Path
+.\scripts\install.ps1 -Target Codex
+.\scripts\install.ps1 -Target Codex -Apply
+.\scripts\verify_install.ps1 -Target Codex -SourceRoot $sourceRoot
 ```
 
 설치 후 Codex를 새로 시작하면 스킬 목록에서 `minutes-hwpx-finalize-legal-review`를 사용할 수 있습니다.
 
-반복 설치에는 저장소의 스크립트를 사용할 수 있습니다. 기본은 미리보기이며, 실제 복사·백업은 `-Apply`가 있을 때만 수행합니다.
+첫 실행은 미리보기입니다. `-Apply` 실행은 배포 목록의 전체 파일을 스테이징에 복사하고 해시·링크를 검사한 뒤 교체합니다. 기존 설치본과 실패한 후보는 설치 부모 폴더 밖의 `.minutes-skill-deployment`에 보존하며 자동 삭제하지 않습니다. 출력의 `BACKUP_PATH`와 `VERIFY_COMMAND`로 실제 백업·검증 대상을 확인합니다.
+
+사용자 지정 경로를 쓰면 설치·검증에 같은 부모 경로를 전달합니다. 아래 자리표시자는 본인이 정한 실제 절대경로로 바꿉니다.
 
 ```powershell
-.\scripts\install.ps1 -Target Codex
-.\scripts\install.ps1 -Target Codex -Apply
-.\scripts\verify_install.ps1 -Target Codex
+$destinationRoot = '<스킬 설치 부모 폴더의 절대경로>'
+.\scripts\install.ps1 -Target Codex -DestinationRoot $destinationRoot
+.\scripts\install.ps1 -Target Codex -DestinationRoot $destinationRoot -Apply
+.\scripts\verify_install.ps1 -Target Codex -DestinationRoot $destinationRoot -SourceRoot $sourceRoot
 ```
 
 ### 3. Claude Code에 설치
 
-Claude Code도 같은 파일 구조를 사용합니다. 아래 명령으로 Claude 전용 경로에 복사합니다.
+Claude Code도 같은 배포 목록을 사용합니다. 기본 경로는 `%USERPROFILE%\.claude\skills\minutes-hwpx-finalize-legal-review`입니다. 같은 저장소 폴더에서 실행합니다.
 
 ```powershell
-$source = '.\\minutes-finalize-legal-review'
-$target = "$env:USERPROFILE\\.claude\\skills\\minutes-hwpx-finalize-legal-review"
-New-Item -ItemType Directory -Force -Path $target | Out-Null
-Copy-Item "$source\\SKILL.md" "$target\\SKILL.md" -Force
-Copy-Item "$source\\references" "$target" -Recurse -Force
-Copy-Item "$source\\profiles" "$target" -Recurse -Force
-Copy-Item "$source\\agents" "$target" -Recurse -Force
-Copy-Item "$source\\scripts" "$target" -Recurse -Force
-Copy-Item "$source\\VERSION" "$target\\VERSION" -Force
+$sourceRoot = (Get-Location).Path
+.\scripts\install.ps1 -Target Claude
+.\scripts\install.ps1 -Target Claude -Apply
+.\scripts\verify_install.ps1 -Target Claude -SourceRoot $sourceRoot
 ```
 
 Claude Code를 새로 시작한 후 다음과 같이 요청합니다.
 
 > 1차 수정된 회의록 HWPX와 시나리오를 기준으로 결재용 실명 정본 HWPX와 정보공개 청구용 비실명 HWPX를 제안하고, 발언별 법률위험을 검토해 주세요.
 
-Claude Code 자동 설치는 `-Target Claude`를 사용합니다.
+두 도구 모두 사용자 지정 `-DestinationRoot`를 지원합니다. 설치본 안에 있는 검증 스크립트를 직접 실행할 때도 신뢰할 수 있는 원본 저장소를 `-SourceRoot`로 지정해야 합니다. 설치 매니페스트만 바꿔 내용 변조를 숨길 수 없도록 원본과 대조합니다.
 
 ```powershell
-.\scripts\install.ps1 -Target Claude
-.\scripts\install.ps1 -Target Claude -Apply
-.\scripts\verify_install.ps1 -Target Claude
+# 저장소 폴더에서 설치 제거 대상과 백업 위치부터 확인
+.\scripts\uninstall.ps1 -Target Claude
+# 제거를 결정한 경우에만 실행: 등록된 설치 폴더를 복구 가능한 보관 경로로 이동
+.\scripts\uninstall.ps1 -Target Claude -Apply
 ```
 
-제거 스크립트도 기본은 미리보기입니다. `-Apply`를 쓰면 해당 스킬 폴더만 백업 후 제거합니다.
+제거 스크립트도 기본은 미리보기이며 영구 삭제하지 않습니다. 설치 매니페스트가 없는 과거 수동 설치본은 제거하지 않습니다. 필요하면 먼저 새 설치기로 재설치하여 과거 폴더 전체를 백업하고 등록된 설치본을 만듭니다. 설치·제거 경로가 원본과 겹치거나 재분석 지점인 경우에는 중단합니다.
+
+PowerShell 7의 격리 설치·복구와 Windows PowerShell 5.1의 격리 신규 설치·검증을 시험합니다. 버전별 기본 모듈 경로를 사용하며, 시험용 5.1 자식 프로세스에는 Python에서 상속된 PowerShell 7 모듈 경로를 전달하지 않습니다. 제한된 환경에서 실행정책으로 차단되면 미확인으로 기록하며 실행정책·보안 설정은 변경하지 않습니다.
 
 ## 기본 사용 순서
 
@@ -88,12 +93,21 @@ Claude Code 자동 설치는 `-Target Claude`를 사용합니다.
 2. 업무 관할에 맞는 `profiles/` 파일을 선택합니다.
 3. 1차 수정본 HWPX와 시나리오를 입력합니다.
 4. 결재용 실명 정본 HWPX, 정보공개 청구용 비실명 HWPX, 법률위험 검토표를 별도로 생성합니다.
+5. 사람이 승인한 변경만 결재용 실명 정본에 반영하고, 승인된 비실명 처리만 정보공개 청구용 HWPX에 적용합니다.
+
+소스 정본은 개발용 Git 저장소, Codex·Claude 설치본은 실행용 복사본입니다. 실제 사건자료·승인 JSON·검토 기록·두 HWPX 산출물은 **저장소와 설치 폴더 밖의 기관 승인 제한 작업공간**에 둡니다. `.gitignore`만으로 실자료의 보관·접근통제가 확보되지는 않습니다. [저장 경계](references/storage-boundaries.md)를 확인합니다.
+
+아래 명령은 저장소 폴더에서 실행하며, `$caseRoot`는 이미 승인된 실제 절대경로로 바꿉니다. 도구가 승인이나 접근권한을 부여하지 않습니다.
+
+```powershell
+$caseRoot = '<기관에서 승인한 repo·설치 폴더 밖 제한 작업공간 절대경로>'
+```
 
 법률위험 검토표는 실명·사건번호를 넣지 않은 JSON을 준비한 뒤 다음과 같이 생성합니다. 높은 위험 항목에 사실 요지·확인 자료·시점이 기록된 공식 근거·`L 법무 확인`이 없으면 파일이 생성되지 않습니다.
 
 ```powershell
-py -X utf8 scripts\render_legal_review_report.py .\case-data\review.json `
-  --output .\case-data\법률위험_검토표.md
+py -X utf8 scripts\render_legal_review_report.py "$caseRoot\review.json" `
+  --output "$caseRoot\법률위험_검토표.md"
 ```
 
 입력 필드 형식은 [출력 스키마](references/output-schema.md)를 따릅니다. 이 명령은 회의록 HWPX를 읽거나 외부 MCP로 전송하지 않으며, 검토자가 별도로 작성한 비식별 기록만 렌더링합니다.
@@ -101,20 +115,19 @@ py -X utf8 scripts\render_legal_review_report.py .\case-data\review.json `
 초기 후보 위치만 로컬에서 찾으려면 아래 도구를 쓸 수 있습니다. 후보 JSON에는 원문·일치 단어를 저장하지 않으며, 자동 법률판단이나 자동 수정도 하지 않습니다.
 
 ```powershell
-py -X utf8 scripts\detect_legal_review_candidates.py .\case-data\회의록_1차수정.hwpx `
-  --output .\case-data\법률위험_후보.json
+py -X utf8 scripts\detect_legal_review_candidates.py "$caseRoot\회의록_1차수정.hwpx" `
+  --output "$caseRoot\법률위험_후보.json"
 ```
 
 후보 위치를 사람 검토용 검토표 JSON으로 옮길 때는 다음을 사용합니다. 이 템플릿은 미완성 상태이므로, 실무자가 발언 요지·증거·법령 근거·승인 판단을 채운 뒤에만 검토표 렌더링을 실행합니다.
 
 ```powershell
-py -X utf8 scripts\prepare_legal_review_template.py .\case-data\법률위험_후보.json `
+py -X utf8 scripts\prepare_legal_review_template.py "$caseRoot\법률위험_후보.json" `
   --case-token "기관내부-비식별값" `
-  --output .\case-data\법률위험_검토표_작성템플릿.json
+  --output "$caseRoot\법률위험_검토표_작성템플릿.json"
 ```
 
 시범 운영에서는 [운영 성과지표](references/operation-metrics.md)에 주무관·담당 장학사 검토시간과 비식별 반려 사유 코드를 기록합니다.
-5. 사람이 승인한 변경만 결재용 실명 정본에 반영하고, 승인된 비실명 처리만 정보공개 청구용 HWPX에 적용합니다.
 
 전사 원본이 없는 경우에도 사용할 수 있습니다. 이때는 전사 누락 여부를 판단하지 않고 1차 수정본의 정본화·법률위험 검토만 수행합니다.
 
@@ -122,7 +135,26 @@ py -X utf8 scripts\prepare_legal_review_template.py .\case-data\법률위험_후
 
 저장소의 `scripts/`는 승인된 수정만 반영해 결재용 실명 정본 HWPX와 정보공개 청구용 비실명 HWPX를 새 파일로 만듭니다. 원본 HWPX를 덮어쓰지 않으며, 결과의 ZIP·XML 구조와 원본 대비 문단·표 수를 검사합니다.
 
-실제 사건자료는 `case-data/` 등 기관 승인 경로에서만 처리하고 Git에 커밋하지 않습니다. 전체 사용법과 승인 목록 형식은 [HWPX 처리 도구](references/hwpx-tooling.md)를 확인합니다. 최종 제출 전에는 한글 프로그램에서 두 HWPX를 실제로 열어 형식·페이지·표 구조를 확인해야 합니다.
+실제 사건자료는 저장소·설치 폴더 밖의 기관 승인 제한 작업공간에서만 처리하고 Git에 커밋하지 않습니다. 전체 사용법과 승인 목록 형식은 [HWPX 처리 도구](references/hwpx-tooling.md)를 확인합니다. 최종 제출 전에는 한글 프로그램에서 두 HWPX를 실제로 열어 형식·페이지·표 구조를 확인해야 합니다.
+
+## 최종 검수요약
+
+원본·승인 계획·두 HWPX·법률 검토표 JSON을 현재 파일의 해시로 연결하고, 기술 검사와 담당자 미확인 사항을 한 표로 모읍니다. 아래 경로도 모두 앞서 지정한 제한 작업공간입니다.
+
+```powershell
+py -X utf8 scripts\render_review_summary.py `
+  --source "$caseRoot\회의록_1차수정.hwpx" `
+  --approved "$caseRoot\approved-edits.json" `
+  --approval "$caseRoot\회의록_결재용_실명정본.hwpx" `
+  --disclosure "$caseRoot\회의록_정보공개청구용_비실명본.hwpx" `
+  --legal-review "$caseRoot\review.json" `
+  --human-evidence "$caseRoot\human-evidence.json" `
+  --output "$caseRoot\검수요약.md" --json "$caseRoot\검수요약.json"
+```
+
+법률 검토표나 담당자 확인 기록을 아직 준비하지 않았다면 해당 옵션을 생략해 미확인 상태와 다음 조치를 먼저 확인할 수 있습니다. 기존 파일은 덮어쓰지 않습니다. [검수요약 계약과 확인 기록 예시](references/review-summary.md)를 따릅니다.
+
+`PASS`는 재계산한 기술 검사와 **입력된 담당자 확인 기록**의 완결성입니다. `PARTIAL`은 미확인·미해결 법률 검토, `FAIL`은 변조·불일치·담당자 확인의 명시적 실패 등을 뜻합니다. 법률 항목의 반려는 미해결로 남습니다. 담당자 확인 기록은 전자서명·실행 증명이 아니며 AI가 임의로 작성하지 않습니다. `external_release_authorized`는 항상 `false`이고, 요약 PASS가 법률 결론이나 정보공개 승인으로 바뀌지 않습니다.
 
 ## Korean Law MCP 설치 및 연결
 

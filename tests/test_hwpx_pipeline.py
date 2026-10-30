@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
@@ -15,6 +16,21 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 PYTHON = sys.executable
+
+
+def approval_spec(payload: dict, source: Path) -> dict:
+    """Explicit synthetic decisions, never inference for real case approvals."""
+    payload["schema_version"] = 2
+    payload["location_scheme"] = "structural-v2"
+    payload["source_sha256"] = hashlib.sha256(source.read_bytes()).hexdigest()
+    for record in payload.get("edits", []) + payload.get("redactions", []):
+        if record.get("approved") is True:
+            if "location" not in record:
+                record["match_scope"] = "document"
+            record.update({"issue_id": "synthetic-issue-001", "decided_by_role": "합성 검토자",
+                           "decided_at": "2026-10-30T09:00:00+09:00", "evidence_refs": ["fixture:synthetic-001"]})
+            record.setdefault("reason", "합성 승인 사유")
+    return payload
 
 
 def run(*arguments: str, cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -61,7 +77,7 @@ class HwpxPipelineTests(unittest.TestCase):
             source = work / "source.hwpx"
             synthetic_hwpx(source, "홍길동은 공식 자료 없는 진단 추정")
             candidates, contexts = work / "candidates.json", work / "contexts.json"
-            candidates.write_text(json.dumps({"candidates": [{"location_id": "section-0/paragraph-1", "rule_id": "sensitive-health"}]}, ensure_ascii=False), encoding="utf-8")
+            candidates.write_text(json.dumps({"location_scheme": "structural-v2", "source_document_hash": hashlib.sha256(source.read_bytes()).hexdigest(), "candidates": [{"location_id": "section-0/paragraph-1", "rule_id": "sensitive-health"}]}, ensure_ascii=False), encoding="utf-8")
             result = run(str(SCRIPTS / "export_candidate_context.py"), str(source), "--candidates", str(candidates), "--output", str(contexts), cwd=ROOT)
             self.assertEqual(result.returncode, 0, result.stderr)
             text = contexts.read_text(encoding="utf-8")
@@ -94,7 +110,13 @@ class HwpxPipelineTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             payload = json.loads(candidates.read_text(encoding="utf-8"))
             self.assertEqual(len(payload["redactions"]), 1)
-            self.assertTrue(payload["redactions"][0]["approved"])
+            self.assertFalse(payload["redactions"][0]["approved"])
+            self.assertEqual(payload["schema_version"], 2)
+            self.assertEqual(payload["location_scheme"], "structural-v2")
+            self.assertEqual(payload["redactions"][0]["match_scope"], "document")
+            self.assertEqual(payload["source_sha256"], hashlib.sha256(source.read_bytes()).hexdigest())
+            self.assertEqual(payload["redactions"][0]["approval_status"], "추가 승인 필요")
+            self.assertNotIn("decided_by_role", payload["redactions"][0])
 
     def test_refuses_disclosure_only_content_edit(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -104,7 +126,7 @@ class HwpxPipelineTests(unittest.TestCase):
             approved = work / "approved.json"
             approved.write_text(
                 json.dumps(
-                    {
+                    approval_spec({
                         "edits": [
                             {
                                 "id": "unsafe-disclosure-edit",
@@ -115,7 +137,7 @@ class HwpxPipelineTests(unittest.TestCase):
                             }
                         ],
                         "redactions": [],
-                    },
+                    }, source),
                     ensure_ascii=False,
                 ),
                 encoding="utf-8",
@@ -146,7 +168,7 @@ class HwpxPipelineTests(unittest.TestCase):
             approved = work / "approved.json"
             approved.write_text(
                 json.dumps(
-                    {
+                    approval_spec({
                         "edits": [],
                         "redactions": [
                             {
@@ -155,7 +177,7 @@ class HwpxPipelineTests(unittest.TestCase):
                                 "scope": "disclosure",
                                 "from": "홍길동",
                                 "to": "○○",
-                                "location": "section-0/paragraph-1",
+                                "match_scope": "document",
                                 "redaction_type": "성명",
                             },
                             {
@@ -172,7 +194,7 @@ class HwpxPipelineTests(unittest.TestCase):
                                 "max_matches": 1,
                             }
                         ],
-                    },
+                    }, source),
                     ensure_ascii=False,
                 ),
                 encoding="utf-8",
@@ -196,6 +218,8 @@ class HwpxPipelineTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             pair = run(
                 str(SCRIPTS / "verify_release_pair.py"),
+                "--source",
+                str(source),
                 "--approval",
                 str(approval),
                 "--disclosure",
@@ -218,7 +242,7 @@ class HwpxPipelineTests(unittest.TestCase):
             approved = work / "approved.json"
             approved.write_text(
                 json.dumps(
-                    {
+                    approval_spec({
                         "edits": [
                             {
                                 "id": "edit-typo",
@@ -236,11 +260,11 @@ class HwpxPipelineTests(unittest.TestCase):
                                 "scope": "disclosure",
                                 "from": "홍길동",
                                 "to": "○○",
-                                "location": "section-0/paragraph-1",
+                                "match_scope": "document",
                                 "redaction_type": "성명",
                             }
                         ],
-                    },
+                    }, source),
                     ensure_ascii=False,
                 ),
                 encoding="utf-8",
@@ -279,6 +303,8 @@ class HwpxPipelineTests(unittest.TestCase):
 
             pair = run(
                 str(SCRIPTS / "verify_release_pair.py"),
+                "--source",
+                str(source),
                 "--approval",
                 str(approval),
                 "--disclosure",

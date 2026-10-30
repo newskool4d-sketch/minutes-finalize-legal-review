@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 from hwpx_common import read_json, write_json
+from hwpx_locations import LOCATION_SCHEME, require_location_scheme, validate_location_id
 
 
 def main() -> int:
@@ -23,6 +24,7 @@ def main() -> int:
         if args.output.exists():
             raise FileExistsError(f"출력 파일이 이미 존재합니다: {args.output}")
         source = read_json(args.candidates)
+        require_location_scheme(source)
         candidates = source.get("candidates")
         document_hash = source.get("source_document_hash")
         if not isinstance(candidates, list) or not isinstance(document_hash, str):
@@ -31,6 +33,7 @@ def main() -> int:
         for index, candidate in enumerate(candidates, start=1):
             if not isinstance(candidate, dict):
                 raise ValueError("후보 항목은 객체여야 합니다.")
+            validate_location_id(candidate["location_id"])
             issues.append(
                 {
                     "issue_id": f"issue-{index:03d}",
@@ -60,6 +63,7 @@ def main() -> int:
         write_json(
             args.output,
             {
+                "location_scheme": LOCATION_SCHEME,
                 "case": {
                 "case_token": args.case_token,
                 "reviewed_at": args.reviewed_at,

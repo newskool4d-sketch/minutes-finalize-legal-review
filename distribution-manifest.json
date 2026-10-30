@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "skill_name": "minutes-hwpx-finalize-legal-review",
+  "include": ["SKILL.md", "VERSION", "agents", "profiles", "references", "scripts", "examples", "distribution-manifest.json"],
+  "allowed_extensions": [".md", ".py", ".ps1", ".yaml", ".yml", ".json"],
+  "exclude_names": ["__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache", "node_modules", ".git", "logs", "tmp", "temp", "actual-data", "private-data"],
+  "exclude_extensions": [".pyc", ".pyo", ".log", ".tmp", ".temp", ".hwpx", ".hwp", ".pdf", ".docx", ".xlsx"]
+}

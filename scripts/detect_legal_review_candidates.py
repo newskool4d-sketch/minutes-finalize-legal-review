@@ -17,7 +17,8 @@ from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
-from hwpx_common import local_name, section_names, validate_basic_hwpx, write_json
+from hwpx_common import section_names, validate_basic_hwpx, write_json
+from hwpx_locations import LOCATION_SCHEME, parse_section
 
 
 RULES = (
@@ -29,19 +30,8 @@ RULES = (
 )
 
 
-def text_of(node: ET.Element) -> str:
-    return "".join(part for part in node.itertext() if part).strip()
-
-
 def paragraphs(section_index: int, xml_bytes: bytes) -> list[tuple[str, str]]:
-    root = ET.fromstring(xml_bytes)
-    records: list[tuple[str, str]] = []
-    paragraph = 0
-    for node in root.iter():
-        if local_name(node.tag) == "p":
-            paragraph += 1
-            records.append((f"section-{section_index}/paragraph-{paragraph}", text_of(node)))
-    return records
+    return [(item.location_id, item.own_text.strip()) for item in parse_section(section_index, xml_bytes)]
 
 
 def main() -> int:
@@ -71,7 +61,7 @@ def main() -> int:
                                 "action_code": action_code,
                                 "requires_human_summary": True,
                             })
-        write_json(args.output, {"source_document_hash": metadata["sha256"], "candidates": candidates})
+        write_json(args.output, {"location_scheme": LOCATION_SCHEME, "source_document_hash": metadata["sha256"], "candidates": candidates})
     except (OSError, ValueError, ET.ParseError) as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1

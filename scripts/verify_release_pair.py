@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify that a disclosure HWPX differs from the approval HWPX only by approved redactions."""
+"""Verify both HWPX copies against their source-bound, explicitly approved plan."""
 
 from __future__ import annotations
 
@@ -8,40 +8,21 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from hwpx_common import read_entry_map, read_json, replace_paragraph_text, replace_text_nodes, section_names, validate_basic_hwpx, write_json
+from approval_contract import validate_source_contract
+from apply_approved_edits import build_entry_pair
+from hwpx_common import read_entry_map, read_json, validate_basic_hwpx, write_json
 
-DISCLOSURE_REDACTION_SCOPES = {"disclosure", "정보공개청구용"}
 
-
-def approved_redactions(specification: dict[str, Any]) -> list[dict[str, Any]]:
-    records = specification.get("redactions", [])
-    if not isinstance(records, list):
-        raise ValueError("redactions는 배열이어야 합니다.")
-    selected = []
-    for record in records:
-        if record.get("approved") is not True:
-            continue
-        if str(record.get("scope", "disclosure")) not in DISCLOSURE_REDACTION_SCOPES:
-            raise ValueError(f"비실명 처리 범위가 올바르지 않습니다: {record.get('id', 'unknown')}")
-        if not isinstance(record.get("from"), str) or not record["from"]:
-            raise ValueError(f"from 값이 비어 있습니다: {record.get('id', 'unknown')}")
-        if not isinstance(record.get("to"), str):
-            raise ValueError(f"to 값이 문자열이 아닙니다: {record.get('id', 'unknown')}")
-        if record.get("redaction_type") == "문장 비공개":
-            if not isinstance(record.get("location"), str) or not record["location"].strip():
-                raise ValueError(f"문장 비공개 위치가 없습니다: {record.get('id', 'unknown')}")
-            if not isinstance(record.get("reason"), str) or not record["reason"].strip():
-                raise ValueError(f"문장 비공개 사유가 없습니다: {record.get('id', 'unknown')}")
-            if record.get("human_decision") not in {"담당자 승인", "정보공개 담당 확인", "법무 확인"}:
-                raise ValueError(f"문장 비공개 실무자 판단이 없습니다: {record.get('id', 'unknown')}")
-            if int(record.get("min_matches", 1)) != 1 or int(record.get("max_matches", 1)) != 1:
-                raise ValueError(f"문장 비공개는 정확히 한 곳만 처리해야 합니다: {record.get('id', 'unknown')}")
-        selected.append(record)
-    return sorted(selected, key=lambda record: 0 if record.get("redaction_type") == "문장 비공개" else 1)
+def compare_entries(expected: dict[str, bytes], actual: dict[str, bytes], label: str) -> None:
+    if set(expected) != set(actual):
+        raise ValueError(f"{label}의 ZIP 엔트리 목록이 원본 기반 승인 결과와 다릅니다.")
+    if any(expected[name] != actual[name] for name in expected):
+        raise ValueError(f"{label}에 원본과 승인 목록으로 설명되지 않는 엔트리 바이트 차이가 있습니다.")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", required=True, type=Path, help="승인 목록의 해시와 대조할 실제 원본 HWPX")
     parser.add_argument("--approval", required=True, type=Path, help="결재용 실명 정본 HWPX")
     parser.add_argument("--disclosure", required=True, type=Path, help="정보공개 청구용 비실명 HWPX")
     parser.add_argument("--approved", required=True, type=Path, help="승인 목록 JSON")
@@ -49,53 +30,22 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
+        validate_basic_hwpx(args.source)
         validate_basic_hwpx(args.approval)
         validate_basic_hwpx(args.disclosure)
         specification = read_json(args.approved)
-        redactions = approved_redactions(specification)
+        validate_source_contract(specification, args.source)
+        _, source_entries = read_entry_map(args.source)
+        pair = build_entry_pair(source_entries, specification)
         _, approval_entries = read_entry_map(args.approval)
         _, disclosure_entries = read_entry_map(args.disclosure)
-        if set(approval_entries) != set(disclosure_entries):
-            raise ValueError("두 HWPX의 ZIP 엔트리 목록이 다릅니다.")
-
-        expected = dict(approval_entries)
-        counts: list[dict[str, Any]] = []
-        for record in redactions:
-            total = 0
-            per_file: dict[str, int] = {}
-            sections = section_names(expected.keys())
-            if record.get("redaction_type") == "문장 비공개":
-                location = str(record["location"])
-                try:
-                    section_part, paragraph_part = location.split("/", 1)
-                    section_index = int(section_part.removeprefix("section-"))
-                    paragraph_number = int(paragraph_part.removeprefix("paragraph-"))
-                    filename = sections[section_index]
-                except (IndexError, ValueError) as exc:
-                    raise ValueError(f"문장 비공개 위치 형식이 올바르지 않습니다: {location}") from exc
-                changed_xml, total = replace_paragraph_text(expected[filename], paragraph_number, record["from"], record["to"])
-                if total:
-                    expected[filename] = changed_xml
-                    per_file[filename] = total
-            else:
-                for filename in sections:
-                    changed_xml, count = replace_text_nodes(expected[filename], record["from"], record["to"])
-                    if count:
-                        expected[filename] = changed_xml
-                        per_file[filename] = count
-                        total += count
-            required = int(record.get("min_matches", 1))
-            if total < required:
-                raise ValueError(f"비실명 처리 대조 실패: {record.get('id', 'unknown')} 치환 횟수 {total}")
-            maximum = record.get("max_matches")
-            if maximum is not None and total > int(maximum):
-                raise ValueError(f"비실명 처리 최대 횟수 초과: {record.get('id', 'unknown')} 치환 횟수 {total}")
-            counts.append({"id": record.get("id", "unknown"), "changed_count": total, "files": per_file})
-
-        changed_entries = [name for name in expected if expected[name] != disclosure_entries[name]]
-        if changed_entries:
-            raise ValueError(f"승인된 비실명 처리 외의 차이가 있습니다: {', '.join(changed_entries)}")
-        result = {"status": "ok", "redactions": counts, "entry_count": len(expected)}
+        compare_entries(pair["approval_entries"], approval_entries, "결재용")
+        compare_entries(pair["disclosure_entries"], disclosure_entries, "정보공개 청구용")
+        redaction_ids = {record["id"] for record in pair["redactions"]}
+        counts = [row for row in pair["disclosure_changes"] if row["id"] in redaction_ids]
+        result = {"status": "ok", "technical_pair_valid": True, "schema_version": 2, "source_sha256": specification["source_sha256"],
+                  "disclosure_package": pair["disclosure_package"],
+                  "approval_changes": pair["approval_changes"], "redactions": counts, "entry_count": len(source_entries)}
         if args.json:
             if args.json.exists():
                 raise FileExistsError(f"출력 파일이 이미 존재합니다: {args.json}")
@@ -104,7 +54,7 @@ def main() -> int:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
 
-    print(f"OK: redactions={len(redactions)} | entries={len(expected)}")
+    print(f"OK: redactions={len(counts)} | entries={len(source_entries)}")
     return 0
 
 

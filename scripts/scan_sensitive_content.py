@@ -5,16 +5,12 @@ from __future__ import annotations
 
 import argparse
 import sys
-import zipfile
 from pathlib import Path
-from typing import Any
 from xml.etree import ElementTree as ET
 
-from hwpx_common import local_name, read_json, section_names, validate_basic_hwpx, write_json
-
-
-def paragraph_text(node: ET.Element) -> str:
-    return "".join(part for part in node.itertext() if part)
+from hwpx_common import read_json, read_entry_map, validate_basic_hwpx, write_json
+from hwpx_locations import LOCATION_SCHEME
+from disclosure_package import inspect_disclosure_package
 
 
 def main() -> int:
@@ -33,27 +29,10 @@ def main() -> int:
         if args.output.exists():
             raise FileExistsError(f"출력 파일이 이미 존재합니다: {args.output}")
 
-        findings: list[dict[str, Any]] = []
-        with zipfile.ZipFile(args.input, "r") as archive:
-            for section_index, name in enumerate(section_names(archive.namelist())):
-                root = ET.fromstring(archive.read(name))
-                paragraph_index = 0
-                for node in root.iter():
-                    if local_name(node.tag) != "p":
-                        continue
-                    paragraph_index += 1
-                    text = paragraph_text(node)
-                    for term_index, term in enumerate(terms, start=1):
-                        count = text.count(term)
-                        if count:
-                            findings.append(
-                                {
-                                    "location_id": f"section-{section_index}/paragraph-{paragraph_index}",
-                                    "term_id": f"term-{term_index}",
-                                    "match_count": count,
-                                }
-                            )
-        write_json(args.output, {"input": str(args.input), "findings": findings})
+        _, entries = read_entry_map(args.input)
+        report = inspect_disclosure_package(entries, terms)
+        findings = report["findings"]
+        write_json(args.output, {"location_scheme": LOCATION_SCHEME, "input": str(args.input), **report})
     except (OSError, ValueError, ET.ParseError) as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1

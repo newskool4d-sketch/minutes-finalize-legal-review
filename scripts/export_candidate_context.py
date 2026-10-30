@@ -14,7 +14,8 @@ from collections import defaultdict
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from hwpx_common import local_name, read_json, section_names, validate_basic_hwpx, write_json
+from hwpx_common import read_json, section_names, validate_basic_hwpx, write_json
+from hwpx_locations import LOCATION_SCHEME, parse_section, require_location_scheme, validate_location_id
 
 
 PHONE = re.compile(r"(?<!\d)01[0-9][- ]?\d{3,4}[- ]?\d{4}(?!\d)")
@@ -49,14 +50,7 @@ def mask(text: str, names: set[str]) -> str:
 
 
 def paragraphs(xml_bytes: bytes, section_index: int) -> dict[str, str]:
-    root = ET.fromstring(xml_bytes)
-    result: dict[str, str] = {}
-    number = 0
-    for node in root.iter():
-        if local_name(node.tag) == "p":
-            number += 1
-            result[f"section-{section_index}/paragraph-{number}"] = "".join(node.itertext()).strip()
-    return result
+    return {item.location_id: item.own_text.strip() for item in parse_section(section_index, xml_bytes)}
 
 
 def main() -> int:
@@ -69,13 +63,17 @@ def main() -> int:
     try:
         if args.output.exists():
             raise FileExistsError(f"출력 파일이 이미 존재합니다: {args.output}")
-        validate_basic_hwpx(args.input)
+        metadata = validate_basic_hwpx(args.input)
         candidate_data = read_json(args.candidates)
+        require_location_scheme(candidate_data)
+        if candidate_data.get("source_document_hash") != metadata["sha256"]:
+            raise ValueError("후보 목록의 원본 해시가 실제 HWPX와 다릅니다. 후보를 다시 생성하세요.")
         candidates = candidate_data.get("candidates")
         if not isinstance(candidates, list):
             raise ValueError("후보 목록 형식이 올바르지 않습니다.")
         grouped: dict[str, list[str]] = defaultdict(list)
         for candidate in candidates:
+            validate_location_id(candidate["location_id"])
             grouped[candidate["location_id"]].append(candidate["rule_id"])
         lookup: dict[str, str] = {}
         with zipfile.ZipFile(args.input, "r") as archive:
@@ -88,7 +86,7 @@ def main() -> int:
             if text is None:
                 raise ValueError(f"후보 위치를 찾을 수 없습니다: {location_id}")
             contexts.append({"location_id": location_id, "candidate_rules": sorted(set(rules)), "masked_context": mask(text, names)[: args.max_chars]})
-        write_json(args.output, {"contexts": contexts, "note": "로컬 검토용 마스킹 문맥입니다. 재식별 가능성이 남을 수 있어 외부 전송·커밋 금지."})
+        write_json(args.output, {"location_scheme": LOCATION_SCHEME, "contexts": contexts, "note": "로컬 검토용 마스킹 문맥입니다. 재식별 가능성이 남을 수 있어 외부 전송·커밋 금지."})
     except (OSError, ValueError, KeyError, ET.ParseError) as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1

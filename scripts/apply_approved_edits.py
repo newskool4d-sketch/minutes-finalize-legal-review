@@ -12,6 +12,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from approval_contract import (
+    DISCLOSURE_REDACTION_SCOPES,
+    REAL_SCOPES,
+    approval_metadata,
+    validate_approval_spec,
+    validate_source_contract,
+)
 from hwpx_common import (
     read_entry_map,
     read_json,
@@ -24,16 +31,14 @@ from hwpx_common import (
     write_json,
     write_preserving_zip,
 )
-
-REAL_SCOPES = {"both", "approval", "결재용", "양쪽"}
-DISCLOSURE_REDACTION_SCOPES = {"disclosure", "정보공개청구용"}
-
+from hwpx_locations import validate_location_id
+from disclosure_package import inspect_disclosure_package, neutralize_disclosure_previews
 
 def selected(records: list[dict[str, Any]], scopes: set[str]) -> list[dict[str, Any]]:
     return [
         record
         for record in records
-        if record.get("approved") is True and str(record.get("scope", "both")) in scopes
+        if record.get("approved") is True and record.get("scope") in scopes
     ]
 
 
@@ -71,22 +76,31 @@ def apply_records(
         source, replacement = require_replacement(record)
         total = 0
         per_file: dict[str, int] = {}
-        if record.get("redaction_type") == "문장 비공개":
-            location = str(record["location"])
+        if "location" in record:
+            location = record["location"]
             try:
-                section_part, paragraph_part = location.split("/", 1)
-                section_index = int(section_part.removeprefix("section-"))
-                paragraph_number = int(paragraph_part.removeprefix("paragraph-"))
+                section_index = validate_location_id(location)
                 filename = section_files[section_index]
             except (IndexError, ValueError) as exc:
-                raise ValueError(f"{record.get('id', 'unknown')} 문장 비공개 위치 형식이 올바르지 않습니다: {location}") from exc
-            changed_xml, total = replace_paragraph_text(updated[filename], paragraph_number, source, replacement)
+                raise ValueError(f"{record.get('id', 'unknown')} 승인 치환 위치 형식이 올바르지 않습니다: {location}") from exc
+            if record.get("match_scope") not in (None, "paragraph"):
+                raise ValueError("location과 문서 전체 match_scope를 함께 지정할 수 없습니다.")
+            if record.get("redaction_type") == "문장 비공개":
+                changed_xml, total = replace_paragraph_text(
+                    updated[filename], location, source, replacement, section_index=section_index
+                )
+            else:
+                changed_xml, total = replace_text_nodes(
+                    updated[filename], source, replacement, location_id=location, section_index=section_index
+                )
             if total:
                 updated[filename] = changed_xml
                 per_file[filename] = total
         else:
-            for filename in section_files:
-                changed_xml, count = replace_text_nodes(updated[filename], source, replacement)
+            if record.get("match_scope") != "document" or record.get("redaction_type") == "문장 비공개":
+                raise ValueError("승인 치환에는 location 또는 명시적인 match_scope=document가 필요합니다.")
+            for section_index, filename in enumerate(section_files):
+                changed_xml, count = replace_text_nodes(updated[filename], source, replacement, section_index=section_index)
                 if count:
                     updated[filename] = changed_xml
                     per_file[filename] = count
@@ -109,6 +123,7 @@ def apply_records(
                 "changed_count": total,
                 "files": per_file,
                 "reason": record.get("reason", ""),
+                **approval_metadata(record),
             }
         )
     return updated, audit
@@ -135,9 +150,44 @@ def public_ledger(redactions: list[dict[str, Any]], audit: list[dict[str, Any]])
             "scope": "정보공개청구용 비실명 HWPX만",
             "approval_status": "승인",
             "changed_count": counts.get(str(record.get("id", "unknown")), 0),
+            **approval_metadata(record),
         }
         for record in redactions
     ]
+
+
+def build_entry_pair(entries: dict[str, bytes], specification: dict[str, Any]) -> dict[str, Any]:
+    """Calculate both outputs from the same source entries for apply and verification."""
+    validate_approval_spec(specification)
+    sections = section_names(entries.keys())
+    approval_records = selected(specification.get("edits", []), REAL_SCOPES)
+    disclosure_redactions = sorted(
+        selected(specification.get("redactions", []), DISCLOSURE_REDACTION_SCOPES),
+        key=lambda record: 0 if record.get("redaction_type") == "문장 비공개" else 1,
+    )
+    for record in disclosure_redactions:
+        validate_disclosure_redaction(record)
+    approval_entries, approval_audit = apply_records(entries, sections, approval_records, "결재용")
+    disclosure_entries, disclosure_audit = apply_records(
+        entries, sections, approval_records + disclosure_redactions, "정보공개 청구용"
+    )
+    approval_entries, approval_layout_caches = strip_layout_caches(approval_entries, sections)
+    disclosure_entries, disclosure_layout_caches = strip_layout_caches(disclosure_entries, sections)
+    disclosure_entries, preview_changes = neutralize_disclosure_previews(disclosure_entries)
+    disclosure_checks = inspect_disclosure_package(disclosure_entries, [item["from"] for item in disclosure_redactions])
+    disclosure_checks["preview_changes"] = preview_changes
+    return {
+        "approval_entries": approval_entries,
+        "disclosure_entries": disclosure_entries,
+        "approval_changes": approval_audit,
+        "disclosure_changes": disclosure_audit,
+        "redactions": disclosure_redactions,
+        "disclosure_package": disclosure_checks,
+        "layout_cache": {
+            "approval_stripped_linesegarrays": approval_layout_caches,
+            "disclosure_stripped_linesegarrays": disclosure_layout_caches,
+        },
+    }
 
 
 def main() -> int:
@@ -150,16 +200,16 @@ def main() -> int:
     parser.add_argument("--redaction-ledger", required=True, type=Path, help="비실명처리 대장 JSON")
     args = parser.parse_args()
 
-    outputs = [args.approval_output.resolve(), args.disclosure_output.resolve()]
+    outputs = [args.approval_output.resolve(), args.disclosure_output.resolve(),
+               args.audit.resolve(), args.redaction_ledger.resolve()]
     source = args.source.resolve()
-    if source in outputs:
-        print("FAIL: 원본 파일을 출력 파일로 지정할 수 없습니다.", file=sys.stderr)
+    if {source, args.approved.resolve()}.intersection(outputs):
+        print("FAIL: 원본 또는 승인 목록을 출력 파일로 지정할 수 없습니다.", file=sys.stderr)
         return 1
-    if len(set(outputs)) != 2:
-        print("FAIL: 결재용과 정보공개 청구용 출력 파일은 달라야 합니다.", file=sys.stderr)
+    if len(set(outputs)) != 4:
+        print("FAIL: HWPX·변경이력·대장 4개 출력 경로는 모두 달라야 합니다.", file=sys.stderr)
         return 1
-    derived_outputs = outputs + [args.audit.resolve(), args.redaction_ledger.resolve()]
-    existing = [str(path) for path in derived_outputs if path.exists()]
+    existing = [str(path) for path in outputs if path.exists()]
     if existing:
         print(f"FAIL: 기존 산출물을 덮어쓸 수 없습니다: {', '.join(existing)}", file=sys.stderr)
         return 1
@@ -167,63 +217,29 @@ def main() -> int:
     try:
         validate_basic_hwpx(source)
         specification = read_json(args.approved)
-        edits = specification.get("edits", [])
-        redactions = specification.get("redactions", [])
-        if not isinstance(edits, list) or not isinstance(redactions, list):
-            raise ValueError("edits와 redactions는 배열이어야 합니다.")
-
+        validate_source_contract(specification, source)
         infos, entries = read_entry_map(source)
-        sections = section_names(entries.keys())
-        invalid_edits = [record.get("id", "unknown") for record in selected(edits, {"disclosure", "정보공개청구용"})]
-        invalid_redactions = [
-            record.get("id", "unknown")
-            for record in redactions
-            if record.get("approved") is True
-            and str(record.get("scope", "disclosure")) not in DISCLOSURE_REDACTION_SCOPES
-        ]
-        if invalid_edits:
-            raise ValueError(f"정보공개 전용 일반 수정은 허용하지 않습니다. redactions로 이동하세요: {invalid_edits}")
-        if invalid_redactions:
-            raise ValueError(f"비실명 처리는 정보공개 청구용 범위만 허용합니다: {invalid_redactions}")
-        for record in selected(redactions, DISCLOSURE_REDACTION_SCOPES):
-            validate_disclosure_redaction(record)
-
-        approval_records = selected(edits, REAL_SCOPES)
-        disclosure_edits = approval_records
-        # Whole-sentence masks need to compare against the untouched paragraph.
-        # Apply them before name-level masks that may occur inside that paragraph.
-        disclosure_redactions = sorted(
-            selected(redactions, DISCLOSURE_REDACTION_SCOPES),
-            key=lambda record: 0 if record.get("redaction_type") == "문장 비공개" else 1,
-        )
-
-        approval_entries, approval_audit = apply_records(entries, sections, approval_records, "결재용")
-        disclosure_entries, disclosure_audit = apply_records(
-            entries, sections, disclosure_edits + disclosure_redactions, "정보공개 청구용"
-        )
-        approval_entries, approval_layout_caches = strip_layout_caches(approval_entries, sections)
-        disclosure_entries, disclosure_layout_caches = strip_layout_caches(disclosure_entries, sections)
-        write_preserving_zip(args.approval_output, infos, approval_entries)
-        write_preserving_zip(args.disclosure_output, infos, disclosure_entries)
+        pair = build_entry_pair(entries, specification)
+        write_preserving_zip(args.approval_output, infos, pair["approval_entries"])
+        write_preserving_zip(args.disclosure_output, infos, pair["disclosure_entries"])
         approval_validation = validate_basic_hwpx(args.approval_output)
         disclosure_validation = validate_basic_hwpx(args.disclosure_output)
 
         write_json(
             args.audit,
             {
+                "schema_version": 2,
                 "source_sha256": sha256_file(source),
                 "approval_output": {"path": str(args.approval_output), "sha256": approval_validation["sha256"]},
                 "disclosure_output": {"path": str(args.disclosure_output), "sha256": disclosure_validation["sha256"]},
-                "approval_changes": approval_audit,
-                "disclosure_changes": disclosure_audit,
-                "layout_cache": {
-                    "approval_stripped_linesegarrays": approval_layout_caches,
-                    "disclosure_stripped_linesegarrays": disclosure_layout_caches,
-                },
+                "approval_changes": pair["approval_changes"],
+                "disclosure_changes": pair["disclosure_changes"],
+                "layout_cache": pair["layout_cache"],
+                "disclosure_package": pair["disclosure_package"],
                 "note": "원문과 직접식별정보는 이 변경이력에 저장하지 않습니다.",
             },
         )
-        write_json(args.redaction_ledger, public_ledger(disclosure_redactions, disclosure_audit))
+        write_json(args.redaction_ledger, public_ledger(pair["redactions"], pair["disclosure_changes"]))
     except (OSError, ValueError, KeyError) as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1

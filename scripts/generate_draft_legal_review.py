@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any
 
 from hwpx_common import read_json, write_json
+from hwpx_locations import LOCATION_SCHEME, require_location_scheme
 
 
 LAW_SOURCE = "https://www.law.go.kr/"
@@ -122,32 +123,6 @@ def draft_for(rule: str, reference_date: str, event_date: str) -> dict[str, Any]
     }
 
 
-def adjust_location(issue: dict[str, Any]) -> None:
-    """Apply a small set of metadata-only safeguards for recurring record types."""
-    location = issue["location_id"]
-    # These locations are procedural headings or statutory protection-measure labels,
-    # not necessarily a person's medical fact.  Keep them in the review queue but
-    # lower the automatic draft severity.
-    if location in {
-        "section-0/paragraph-1109", "section-0/paragraph-1137",
-        "section-0/paragraph-1155", "section-0/paragraph-1174",
-        "section-0/paragraph-1181",
-    }:
-        issue.update({
-            "legal_issue_type": ["절차", "개인정보"], "risk_level": "중간", "action_code": "V",
-            "statement_summary": "보호조치 또는 치료·상담 관련 조치의 법정 항목·표결을 기록한 문구",
-            "suggested_wording": "조치의 법적 근거·의결내용은 유지하되, 구체적 건강상태나 불필요한 개인 사정이 함께 드러나지 않았는지 확인한다.",
-            "reasoning_summary": "조치 항목의 기록 자체와 개인의 건강정보 공개 필요성은 구별해 검토해야 한다.",
-        })
-    if location == "section-0/paragraph-1059":
-        issue.update({
-            "risk_level": "높음", "action_code": "L", "legal_issue_type": ["재량판단", "절차", "법적 근거"],
-            "statement_summary": "점수·조치 수준과 예외적 조치 선택의 연결을 기록한 진술",
-            "suggested_wording": "당시 적용 기준, 예외 적용 요건, 표결 결과와 결정 사유의 일치 여부를 법무와 대조한 뒤 문구를 확정한다.",
-            "reasoning_summary": "점수와 실제 조치의 관계 또는 예외 적용은 행정심판·소송에서 핵심 쟁점이 될 수 있어 근거·시점·비례성을 별도 확인해야 한다.",
-        })
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("template", type=Path, help="prepare_legal_review_template.py 출력 JSON")
@@ -159,6 +134,7 @@ def main() -> int:
         if args.output.exists():
             raise FileExistsError(f"출력 파일이 이미 존재합니다: {args.output}")
         payload = read_json(args.template)
+        require_location_scheme(payload)
         case, issues = payload.get("case"), payload.get("issues")
         if not isinstance(case, dict) or not isinstance(issues, list):
             raise ValueError("법률위험 검토표 템플릿 형식이 올바르지 않습니다.")
@@ -171,7 +147,6 @@ def main() -> int:
                 raise ValueError("candidate_rule이 필요합니다.")
             draft = draft_for(rule, args.reference_date, args.event_date)
             completed = item | draft
-            adjust_location(completed)
             result.append(completed)
         event_dates = case.get("event_dates") if isinstance(case.get("event_dates"), dict) else {}
         case = case | {
@@ -184,6 +159,7 @@ def main() -> int:
             },
         }
         write_json(args.output, {
+            "location_scheme": LOCATION_SCHEME,
             "case": case,
             "issues": result,
             "note": "후보별 초안입니다. 사건·심의일과 당시 시행 법령, 사실·증거·정보공개 사유를 담당자 또는 법무가 확인하기 전에는 결재·공개본 수정 근거로 사용할 수 없습니다.",

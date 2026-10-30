@@ -13,7 +13,8 @@ import zipfile
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from hwpx_common import local_name, section_names, validate_basic_hwpx, write_json
+from hwpx_common import section_names, sha256_file, validate_basic_hwpx, write_json
+from hwpx_locations import LOCATION_SCHEME, parse_section
 
 ROSTER_PATTERNS = (
     re.compile(r"위원\s*\d+(?:\([^)]*\))?\s+([가-힣](?:\s*[가-힣]){1,3})(?=\s|\(|$)"),
@@ -23,8 +24,7 @@ ROSTER_PATTERNS = (
 
 
 def text_from_xml(xml_bytes: bytes) -> str:
-    root = ET.fromstring(xml_bytes)
-    return "\n".join("".join(node.itertext()) for node in root.iter() if local_name(node.tag) == "p")
+    return "\n".join(item.own_text for item in parse_section(0, xml_bytes))
 
 
 def variants(text: str, normalized: str) -> set[str]:
@@ -37,7 +37,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", type=Path, help="검사할 HWPX 파일")
     parser.add_argument("--output", required=True, type=Path, help="로컬 승인 목록 JSON 경로")
-    parser.add_argument("--approve-detected", action="store_true", help="탐지한 후보를 승인 상태로 기록")
+    parser.add_argument("--approve-detected", action="store_true", help="호환 옵션: 탐지 후보는 여전히 추가 승인 필요 상태로만 기록")
     args = parser.parse_args()
 
     try:
@@ -62,23 +62,25 @@ def main() -> int:
         redactions = [
             {
                 "id": f"redact-name-{index:03d}",
-                "approved": args.approve_detected,
+                "approved": False,
+                "approval_status": "추가 승인 필요" if args.approve_detected else "미검토",
                 "scope": "disclosure",
                 "from": value,
                 "to": "○○",
-                "location": "자동 탐지: 역할 표기 주변",
+                "match_scope": "document",
                 "redaction_type": "성명",
                 "reason": "정보공개 청구용 비실명 처리",
                 "min_matches": 1,
             }
             for index, value in enumerate(sorted(detected), start=1)
         ]
-        write_json(args.output, {"edits": [], "redactions": redactions})
+        write_json(args.output, {"schema_version": 2, "location_scheme": LOCATION_SCHEME, "source_sha256": sha256_file(args.input),
+                                 "edits": [], "redactions": redactions})
     except (OSError, ValueError, ET.ParseError) as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
 
-    print(f"OK: candidates={len(redactions)} | approved={args.approve_detected}")
+    print(f"OK: candidates={len(redactions)} | approved=False | human_approval_required=True")
     return 0
 
 

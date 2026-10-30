@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "artifact_hashes": {
+    "source": null,
+    "approved_plan": null,
+    "approval": null,
+    "disclosure": null,
+    "legal_review": null
+  },
+  "checks": {
+    "approval_open": {"result": "pending"},
+    "disclosure_open": {"result": "pending"},
+    "legal_review": {"result": "pending"},
+    "public_decision": {
+      "result": "pending",
+      "coverage": {"manual_entry_ids": [], "finding_ids": []}
+    },
+    "final_confirmation": {"result": "pending"}
+  }
+}

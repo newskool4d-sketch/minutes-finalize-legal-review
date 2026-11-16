@@ -13,6 +13,7 @@ import unittest
 import warnings
 import zipfile
 from pathlib import Path
+from unittest.mock import patch
 
 from test_hwpx_pipeline import approval_spec, synthetic_hwpx
 
@@ -73,7 +74,7 @@ class ReviewSummaryTests(unittest.TestCase):
         pair = build_entry_pair(entries, self.plan)
         for key in ("approval", "disclosure"):
             self.paths[key].unlink(missing_ok=True)
-            write_preserving_zip(self.paths[key], infos, pair[key + "_entries"])
+            write_preserving_zip(self.paths[key], infos, pair[key + "_entries"], disclosure=key == "disclosure")
 
     def make_human(self) -> dict:
         roles = {"approval_open": "document_reviewer", "disclosure_open": "document_reviewer",
@@ -197,11 +198,68 @@ class ReviewSummaryTests(unittest.TestCase):
 
     def test_v_requires_record_correction_or_legal_confirmation(self) -> None:
         self.legal["issues"][0]["action_code"] = "V"
-        for state, expected in (("담당자 승인", "PARTIAL"), ("수정 반영", "PASS"), ("법무 확인", "PASS")):
+        for state, expected in (("담당자 승인", "PARTIAL"), ("수정 반영", "PARTIAL"), ("법무 확인", "PASS")):
             self.legal["issues"][0]["approval_status"] = state
             dump(self.paths["legal_review"], self.legal)
             dump(self.paths["human_evidence"], self.make_human())
             self.assertEqual(self.build()["quality_result"], expected)
+
+    def correction(self, **overrides: object) -> dict:
+        return {"id": "correct-statement", "issue_id": "synthetic-issue", "approved": True,
+                "scope": "both", "location": "section-0/paragraph-2", "from": "기본", "to": "확인됨",
+                "decided_by_role": "합성 검토자", "decided_at": "2026-10-30T09:00:00+09:00",
+                "evidence_refs": ["fixture:correction-001"], "reason": "합성 승인 사유", **overrides}
+
+    def save_correction_case(self) -> None:
+        self.legal["issues"][0].update(action_code="V", approval_status="수정 반영")
+        dump(self.paths["approved"], self.plan)
+        self.rebuild_pair()
+        dump(self.paths["legal_review"], self.legal)
+        dump(self.paths["human_evidence"], self.make_human())
+
+    def test_correction_requires_same_issue_location_and_real_change(self) -> None:
+        for changes in ({"issue_id": "another-issue"},
+                        {"location": "section-0/paragraph-3", "from": "오타"},
+                        {"to": "기본"}, {"from": "missing-text", "min_matches": 0}):
+            with self.subTest(changes=changes):
+                self.plan["edits"] = [self.correction(**changes)]
+                self.save_correction_case()
+                self.assertEqual(self.build()["quality_result"], "PARTIAL")
+        self.plan["edits"] = [self.correction()]
+        self.save_correction_case()
+        self.assertEqual(self.build()["quality_result"], "PASS")
+
+    def test_public_only_change_cannot_resolve_both_copies_correction(self) -> None:
+        self.plan["redactions"].append(self.correction(scope="disclosure", redaction_type="기타"))
+        self.save_correction_case()
+        self.assertEqual(self.build()["quality_result"], "PARTIAL")
+        self.legal["issues"][0]["recommended_scope"] = "정보공개청구용"
+        dump(self.paths["legal_review"], self.legal)
+        dump(self.paths["human_evidence"], self.make_human())
+        self.assertEqual(self.build()["quality_result"], "PASS")
+
+    def test_document_correction_must_really_change_issue_location(self) -> None:
+        record = self.correction(match_scope="document", **{"from": "오타"})
+        record.pop("location")
+        self.plan["edits"] = [record]
+        self.save_correction_case()
+        self.assertEqual(self.build()["quality_result"], "PARTIAL")
+        record["from"] = "기본"
+        self.save_correction_case()
+        self.assertEqual(self.build()["quality_result"], "PASS")
+
+    def test_reverted_change_does_not_count_as_correction(self) -> None:
+        self.plan["edits"] = [self.correction(), self.correction(
+            id="revert-statement", issue_id="another-issue", **{"from": "확인됨", "to": "기본"})]
+        self.save_correction_case()
+        self.assertEqual(self.build()["quality_result"], "PARTIAL")
+
+    def test_reverted_issue_with_unrelated_change_in_same_paragraph_stays_partial(self) -> None:
+        self.plan["edits"] = [self.correction(), self.correction(
+            id="revert-statement", issue_id="another-issue", **{"from": "확인됨", "to": "기본"}),
+            self.correction(id="other-correction", issue_id="another-issue", **{"from": "검증", "to": "점검"})]
+        self.save_correction_case()
+        self.assertEqual(self.build()["quality_result"], "PARTIAL")
 
     def test_duplicate_entries_in_any_hwpx_fail_closed(self) -> None:
         for key in ("source", "approval", "disclosure"):
@@ -218,6 +276,78 @@ class ReviewSummaryTests(unittest.TestCase):
                 self.assertEqual(result["checks"]["package_structure"]["status"], "FAIL")
                 self.assertEqual(result["checks"]["technical_pair"]["status"], "FAIL")
                 self.paths[key].write_bytes(original)
+
+    def test_output_zip_metadata_is_checked_even_with_current_human_hashes(self) -> None:
+        with zipfile.ZipFile(self.paths["disclosure"], "a") as archive:
+            archive.comment = b"PRIVATE-METADATA"
+        dump(self.paths["human_evidence"], self.make_human())
+        result = self.build()
+        self.assertEqual(result["checks"]["technical_pair"]["status"], "FAIL")
+        self.assertEqual(result["quality_result"], "FAIL")
+        self.assertNotIn("PRIVATE-METADATA", json.dumps(result))
+
+    def test_hashing_and_parsing_share_snapshot_without_intermediate_reopens(self) -> None:
+        original_read = Path.read_bytes
+        reads = {path: 0 for path in self.paths.values()}
+
+        def counted_read(path: Path) -> bytes:
+            if path in reads:
+                reads[path] += 1
+            return original_read(path)
+
+        with patch.object(Path, "read_bytes", counted_read):
+            result = self.build()
+        self.assertEqual(result["quality_result"], "PASS")
+        # First capture feeds every hash/parser; second read only checks final
+        # stability. In particular the human-evidence input is included too.
+        self.assertEqual(set(reads.values()), {2}, reads)
+
+    def test_human_evidence_changed_during_review_fails_stability(self) -> None:
+        validate = self.summary.validate_human_evidence
+
+        def mutate_after_capture(payload: object, *args: object, **kwargs: object) -> dict:
+            result = validate(payload, *args, **kwargs)
+            if payload is not None:
+                dump(self.paths["human_evidence"], {"schema_version": 1, "checks": {}})
+            return result
+
+        with patch.object(self.summary, "validate_human_evidence", mutate_after_capture):
+            result = self.build()
+        self.assertEqual(result["checks"]["input_stability"]["status"], "FAIL")
+        self.assertEqual(result["quality_result"], "FAIL")
+
+    def test_whitespace_hash_survives_candidate_template_draft_summary_pipeline(self) -> None:
+        from hwpx_common import read_entry_map, write_preserving_zip
+        raw = " \t합성 검증 사례: 진단 추정\n  "
+        infos, entries = read_entry_map(self.paths["source"])
+        entries["Contents/section0.xml"] = entries["Contents/section0.xml"].replace(
+            "합성 검증 사례: 기본".encode("utf-8"), raw.encode("utf-8"))
+        self.paths["source"].unlink()
+        write_preserving_zip(self.paths["source"], infos, entries)
+        self.plan["source_sha256"] = self.sha("source")
+        dump(self.paths["approved"], self.plan)
+        self.rebuild_pair()
+        candidates, template, draft = (self.work / name for name in ("candidates.json", "template.json", "draft.json"))
+        commands = [
+            ["detect_legal_review_candidates.py", str(self.paths["source"]), "--output", str(candidates)],
+            ["prepare_legal_review_template.py", str(candidates), "--output", str(template), "--case-token", "synthetic"],
+            ["generate_draft_legal_review.py", str(template), "--output", str(draft)],
+        ]
+        for script, *args in commands:
+            result = subprocess.run([sys.executable, "-B", "-X", "utf8", str(SCRIPTS / script), *args],
+                                    cwd=ROOT, text=True, capture_output=True, encoding="utf-8", check=False)
+            self.assertEqual(result.returncode, 0, result.stderr)
+        expected = hashlib.sha256(raw.encode("utf-8")).hexdigest()
+        for path, collection in ((candidates, "candidates"), (template, "issues"), (draft, "issues")):
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            items = [item for item in payload[collection] if item["location_id"] == "section-0/paragraph-2"]
+            self.assertTrue(items)
+            self.assertTrue(all(item["statement_text_hash"] == expected for item in items))
+        dump(self.paths["legal_review"], json.loads(draft.read_text(encoding="utf-8")))
+        dump(self.paths["human_evidence"], self.make_human())
+        result = self.build()
+        self.assertEqual(result["checks"]["legal_source_binding"]["status"], "PASS")
+        self.assertEqual(result["quality_result"], "PARTIAL")  # still an unapproved draft
 
     def test_transcript_warning_is_fixed_for_pass_and_partial(self) -> None:
         warning = "전사 원본 대조 미실행: 전사 누락·전사 정확도 확인 불가"

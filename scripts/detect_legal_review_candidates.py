@@ -9,15 +9,13 @@ the legal-review report.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import re
 import sys
-import zipfile
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
 
-from hwpx_common import section_names, validate_basic_hwpx, write_json
+from hwpx_common import read_hwpx_snapshot, section_names, statement_text_hash, validate_snapshot, write_json
 from hwpx_locations import LOCATION_SCHEME, parse_section
 
 
@@ -31,7 +29,9 @@ RULES = (
 
 
 def paragraphs(section_index: int, xml_bytes: bytes) -> list[tuple[str, str]]:
-    return [(item.location_id, item.own_text.strip()) for item in parse_section(section_index, xml_bytes)]
+    # The statement hash binds exact own_text, including leading/trailing space.
+    # Never normalize the evidence differently from the final summary verifier.
+    return [(item.location_id, item.own_text) for item in parse_section(section_index, xml_bytes)]
 
 
 def main() -> int:
@@ -42,25 +42,25 @@ def main() -> int:
     try:
         if args.output.exists():
             raise FileExistsError(f"출력 파일이 이미 존재합니다: {args.output}")
-        metadata = validate_basic_hwpx(args.input)
+        snapshot = read_hwpx_snapshot(args.input)
+        metadata = validate_snapshot(snapshot)
         candidates: list[dict[str, Any]] = []
         seen: set[tuple[str, str]] = set()
-        with zipfile.ZipFile(args.input, "r") as archive:
-            for index, name in enumerate(section_names(archive.namelist())):
-                for location_id, text in paragraphs(index, archive.read(name)):
-                    for rule_id, pattern, issue_types, risk_level, action_code in RULES:
-                        if pattern.search(text) and (location_id, rule_id) not in seen:
-                            seen.add((location_id, rule_id))
-                            candidates.append({
-                                "candidate_id": f"candidate-{len(candidates) + 1:03d}",
-                                "location_id": location_id,
-                                "statement_text_hash": hashlib.sha256(text.encode("utf-8")).hexdigest(),
-                                "rule_id": rule_id,
-                                "legal_issue_type": issue_types,
-                                "risk_level": risk_level,
-                                "action_code": action_code,
-                                "requires_human_summary": True,
-                            })
+        for index, name in enumerate(section_names(snapshot.entries)):
+            for location_id, text in paragraphs(index, snapshot.entries[name]):
+                for rule_id, pattern, issue_types, risk_level, action_code in RULES:
+                    if pattern.search(text) and (location_id, rule_id) not in seen:
+                        seen.add((location_id, rule_id))
+                        candidates.append({
+                            "candidate_id": f"candidate-{len(candidates) + 1:03d}",
+                            "location_id": location_id,
+                            "statement_text_hash": statement_text_hash(text),
+                            "rule_id": rule_id,
+                            "legal_issue_type": issue_types,
+                            "risk_level": risk_level,
+                            "action_code": action_code,
+                            "requires_human_summary": True,
+                        })
         write_json(args.output, {"location_scheme": LOCATION_SCHEME, "source_document_hash": metadata["sha256"], "candidates": candidates})
     except (OSError, ValueError, ET.ParseError) as exc:
         print(f"FAIL: {exc}", file=sys.stderr)

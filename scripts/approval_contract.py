@@ -52,6 +52,8 @@ def validate_approval_spec(specification: Any, source_sha256: str | None = None)
         for record in records:
             if not isinstance(record, dict):
                 raise ValueError(f"{collection} 항목은 객체여야 합니다.")
+            if collection == "edits" and "redaction_type" in record:
+                raise ValueError("redaction_type은 정보공개 전용 redactions에서만 사용할 수 있습니다.")
             item_id = _nonempty_string(record, "id")
             if item_id in seen_ids:
                 raise ValueError("승인 목록에 중복 id가 있습니다.")

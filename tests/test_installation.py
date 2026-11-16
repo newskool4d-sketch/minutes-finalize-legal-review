@@ -6,16 +6,21 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import queue
 import shutil
 import subprocess
 import sys
 import tempfile
+import threading
 import unittest
 
 
 ROOT = Path(__file__).resolve().parents[1]
 SKILL = "minutes-hwpx-finalize-legal-review"
 PWSH = (shutil.which("pwsh.exe") or shutil.which("pwsh")) if os.name == "nt" else None
+STRICT_WINDOWS = os.environ.get("MINUTES_STRICT_WINDOWS_TESTS") == "1"
+if STRICT_WINDOWS and (os.name != "nt" or not PWSH or not shutil.which("powershell.exe")):
+    raise RuntimeError("Windows strict gate requires Windows, pwsh.exe and powershell.exe; skipping is forbidden")
 
 
 def tree_hashes(root: Path) -> dict[str, str]:
@@ -25,6 +30,11 @@ def tree_hashes(root: Path) -> dict[str, str]:
 
 @unittest.skipUnless(PWSH, "Windows pwsh.exe unavailable: isolated installation tests not run")
 class InstallationTests(unittest.TestCase):
+    def skipTest(self, reason: str) -> None:
+        if STRICT_WINDOWS:
+            self.fail("Windows strict gate forbids skipped installation tests: " + reason)
+        super().skipTest(reason)
+
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory(prefix="회의록 설치 시험 ")
         self.addCleanup(self.temp.cleanup)
@@ -90,6 +100,100 @@ class InstallationTests(unittest.TestCase):
                 self.assertEqual(tree_hashes(backup), previous)
                 self.assertTrue(self.verify()["valid"])
 
+    def test_unlisted_markdown_json_and_scripts_are_not_deployed(self) -> None:
+        for name in ("private-note.md", "private-case.json", "local-helper.py"):
+            (self.source / "examples" / name).write_text("local only", encoding="utf-8")
+        self.install("-Apply")
+        self.assertFalse(any(p.name.startswith(("private-", "local-")) for p in self.installed.rglob("*")))
+        self.assertTrue(self.verify()["valid"])
+
+    def test_allowlist_missing_file_or_directory_is_rejected(self) -> None:
+        required = self.source / "examples" / "human-evidence.example.json"
+        required.unlink()
+        self.install("-Apply", ok=False)
+        self.assertFalse(self.installed.exists())
+        required.mkdir()
+        self.install("-Apply", ok=False)
+        self.assertFalse(self.installed.exists())
+
+    def test_install_and_uninstall_share_exclusive_target_lock(self) -> None:
+        self.install("-Apply")
+        before = tree_hashes(self.installed)
+        def quote(value: str) -> str:
+            return "'" + value.replace("'", "''") + "'"
+        command = ". " + quote(str(self.source / "scripts" / "deployment_common.ps1")) + "; "
+        command += "$d = Get-DeploymentDestination Codex " + quote(str(self.dest)) + "; "
+        command += "$held = Enter-DeploymentLock $d.Path $d.Storage; "
+        command += "try { [Console]::WriteLine('LOCKED'); [Console]::Out.Flush(); [Console]::ReadLine() | Out-Null } finally { $held.Dispose() }"
+        holder = subprocess.Popen([str(PWSH), "-NoProfile", "-NonInteractive", "-Command", command],
+                                  stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                  text=True, encoding="utf-8", errors="replace", cwd=self.work)
+        try:
+            ready: queue.Queue[str] = queue.Queue()
+            threading.Thread(target=lambda: ready.put(holder.stdout.readline()), daemon=True).start()
+            self.assertEqual(ready.get(timeout=20).strip(), "LOCKED")
+            for script in ("install.ps1", "uninstall.ps1"):
+                result = self.run_ps(script, "-DestinationRoot", str(self.dest), "-Apply", ok=False)
+                self.assertIn("DEPLOYMENT_BUSY", result.stderr)
+                self.assertEqual(tree_hashes(self.installed), before)
+        finally:
+            try:
+                holder.communicate("release\n", timeout=20)
+            except subprocess.TimeoutExpired:
+                holder.kill()
+                holder.communicate(timeout=10)
+                self.fail("lock holder did not exit within 20 seconds")
+        self.assertEqual(holder.returncode, 0)
+        self.install("-Apply")
+        self.assertTrue(self.verify()["valid"])
+
+    def test_exclusive_move_and_candidate_ownership(self) -> None:
+        self.install("-Apply")
+        existing = self.work / "existing directory"
+        existing.mkdir()
+        before = tree_hashes(self.installed)
+        command = ". '" + str(self.source / "scripts" / "deployment_common.ps1").replace("'", "''") + "'; "
+        command += "$root = '" + str(self.installed).replace("'", "''") + "'; "
+        command += "$receipt = Get-Content -LiteralPath (Join-Path $root '.minutes-install-manifest.json') -Raw | ConvertFrom-Json; "
+        command += "if (-not (Test-DeploymentCandidateOwner $root $receipt.install_id)) { throw 'expected owned' }; "
+        command += "if (Test-DeploymentCandidateOwner $root 'foreign-id') { throw 'foreign owner accepted' }; "
+        command += "Write-Output 'OWNER_CHECKS_PASSED'; try { Move-DeploymentDirectory $root '"
+        command += str(existing).replace("'", "''") + "'; throw 'MOVE_ACCEPTED_EXISTING_TARGET' } "
+        command += "catch [IO.IOException] { Write-Output 'MOVE_COLLISION_BLOCKED' }"
+        result = subprocess.run([str(PWSH), "-NoProfile", "-NonInteractive", "-Command", command],
+                                capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("OWNER_CHECKS_PASSED", result.stdout)
+        self.assertIn("MOVE_COLLISION_BLOCKED", result.stdout)
+        self.assertEqual(tree_hashes(self.installed), before)
+        self.assertEqual(list(existing.iterdir()), [])
+
+    def test_rollback_preserves_foreign_active_tree_and_original_backup(self) -> None:
+        self.install("-Apply")
+        before = tree_hashes(self.installed)
+        helper = self.source / "scripts" / "deployment_common.ps1"
+        with helper.open("a", encoding="utf-8") as out:
+            out.write("""
+function Invoke-DeploymentTestFailure {
+    param([string]$Phase)
+    if ($Phase -eq 'after-swap') {
+        $path = Join-Path $dest.Path $script:MinutesManifestName
+        $receipt = Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json
+        $receipt.install_id = 'foreign-owner'
+        $receipt | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $path -Encoding UTF8
+        throw 'FOREIGN_OWNER_TEST'
+    }
+}
+""")
+        result = self.install("-Apply", ok=False)
+        self.assertIn("FOREIGN_OWNER_TEST", result.stderr)
+        receipt = json.loads((self.installed / ".minutes-install-manifest.json").read_text(encoding="utf-8-sig"))
+        self.assertEqual(receipt["install_id"], "foreign-owner")
+        backups = list((self.dest.parent / ".minutes-skill-deployment").glob("backup-*"))
+        self.assertEqual(len(backups), 1)
+        self.assertEqual(tree_hashes(backups[0]), before)
+        self.assertFalse((self.installed / SKILL).exists())
+
     def test_missing_and_modified_files_fail(self) -> None:
         self.install("-Apply")
         path = self.installed / "references" / "checklist.md"
@@ -112,16 +216,28 @@ class InstallationTests(unittest.TestCase):
                 entry["sha256"] = hashlib.sha256(path.read_bytes()).hexdigest().upper()
                 entry["length"] = path.stat().st_size
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
-        check = self.verify(ok=False, from_install=True)
+        check = self.verify(ok=False)
         self.assertFalse(check["valid"])
         self.assertIn("references/checklist.md", check["modified"])
         self.assertTrue(check["manifest_errors"])
 
-    def test_installed_verifier_requires_explicit_trusted_source(self) -> None:
+    def test_installed_verifier_refuses_before_loading_installed_helper(self) -> None:
+        self.install("-Apply")
+        helper = self.installed / "scripts" / "deployment_common.ps1"
+        helper.write_text("throw 'UNTRUSTED_HELPER_EXECUTED'", encoding="utf-8-sig")
+        for args in ((), ("-SourceRoot", str(self.source))):
+            result = self.run_ps("verify_install.ps1", "-DestinationRoot", str(self.dest),
+                                 *args, source=self.installed, ok=False)
+            self.assertIn("TRUSTED_SOURCE_REQUIRED", result.stderr)
+            self.assertNotIn("UNTRUSTED_HELPER_EXECUTED", result.stderr)
+        check = self.verify(ok=False)
+        self.assertIn("scripts/deployment_common.ps1", check["modified"])
+
+    def test_verifier_cannot_use_another_source_root(self) -> None:
         self.install("-Apply")
         result = self.run_ps("verify_install.ps1", "-DestinationRoot", str(self.dest),
-                             source=self.installed, ok=False)
-        self.assertIn("SourceRoot", result.stderr)
+                             "-SourceRoot", str(self.installed), ok=False)
+        self.assertIn("TRUSTED_SOURCE_REQUIRED", result.stderr)
 
     def test_installed_broken_links_are_reported(self) -> None:
         self.install("-Apply")
@@ -193,7 +309,7 @@ class InstallationTests(unittest.TestCase):
         before = tree_hashes(self.work)
         preview = self.run_ps("uninstall.ps1", "-DestinationRoot", str(self.dest))
         self.assertEqual(tree_hashes(self.work), before)
-        self.assertIn(str(self.installed / "local note.txt"), preview.stdout)
+        self.assertIn(os.path.normcase(str(self.installed / "local note.txt")), os.path.normcase(preview.stdout))
         previous = tree_hashes(self.installed)
         result = self.run_ps("uninstall.ps1", "-DestinationRoot", str(self.dest), "-Apply")
         backup = Path(next(line.removeprefix("BACKUP_PATH: ") for line in result.stdout.splitlines()
@@ -270,7 +386,8 @@ class InstallationTests(unittest.TestCase):
     def test_reparse_source_is_rejected_before_copy(self) -> None:
         target = self.work / "outside.md"
         target.write_text("outside", encoding="utf-8")
-        link = self.source / "references" / "escape.md"
+        link = self.source / "references" / "checklist.md"
+        link.unlink()
         try:
             link.symlink_to(target)
         except OSError as error:

@@ -103,7 +103,7 @@ function Get-DistributionEntries {
     $manifestPath = Join-Path $source 'distribution-manifest.json'
     Assert-NoDeploymentReparse $manifestPath
     $rules = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if ($rules.schema_version -ne 1 -or $rules.skill_name -ne $script:MinutesSkillName -or
+    if ($rules.schema_version -ne 2 -or $rules.skill_name -ne $script:MinutesSkillName -or
         'distribution-manifest.json' -notin @($rules.include)) { throw '배포 목록 형식 또는 스킬명이 올바르지 않습니다.' }
     $seen = @{}
     $included = @{}
@@ -112,15 +112,14 @@ function Get-DistributionEntries {
         $path = Get-SafeDeploymentPath $source $relative
         if ($included.ContainsKey($relative)) { throw "중복 배포 항목입니다: $relative" }
         $included[$relative] = $true
-        if (-not (Test-Path -LiteralPath $path)) { throw "필수 배포 항목이 없습니다: $relative" }
-        $files = if (Test-Path -LiteralPath $path -PathType Container) { @(Get-DeploymentTreeFiles $path) } else { @($path) }
-        foreach ($file in $files) {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "필수 배포 파일이 없거나 디렉터리가 지정되었습니다: $relative" }
+        foreach ($file in @($path)) {
             $rel = Get-DeploymentRelativePath $source $file
             $parts = @($rel -split '/')
             $excluded = @($parts | Where-Object { $_ -in @($rules.exclude_names) }).Count -gt 0
             $ext = [IO.Path]::GetExtension($file).ToLowerInvariant()
             if ($excluded -or $ext -in @($rules.exclude_extensions) -or
-                ($rel -ne 'VERSION' -and $ext -notin @($rules.allowed_extensions))) { continue }
+                ($rel -ne 'VERSION' -and $ext -notin @($rules.allowed_extensions))) { throw "허용되지 않은 배포 파일 형식입니다: $relative" }
             if ($seen.ContainsKey($rel)) { throw "중복 배포 파일입니다: $rel" }
             $seen[$rel] = $true
             $entries += [pscustomobject]@{ path = $rel; sha256 = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash; length = (Get-Item -LiteralPath $file).Length }
@@ -131,8 +130,45 @@ function Get-DistributionEntries {
 }
 
 function New-DeploymentManifest {
-    param([object[]]$Entries)
-    return [pscustomobject]@{ schema_version = 1; skill_name = $script:MinutesSkillName; files = @($Entries) }
+    param([object[]]$Entries, [string]$InstallId)
+    return [pscustomobject]@{ schema_version = 1; skill_name = $script:MinutesSkillName; install_id = $InstallId; files = @($Entries) }
+}
+
+function Enter-DeploymentLock {
+    param([string]$Destination, [string]$Storage)
+    Assert-NoDeploymentReparse $Storage
+    $locks = Join-Path $Storage 'locks'
+    Assert-NoDeploymentReparse $locks
+    New-Item -ItemType Directory -Path $locks -Force | Out-Null
+    $hash = [Security.Cryptography.SHA256]::Create()
+    try {
+        $key = [BitConverter]::ToString($hash.ComputeHash([Text.Encoding]::UTF8.GetBytes(
+            (Get-FullDeploymentPath $Destination).ToUpperInvariant()))).Replace('-', '')
+    }
+    finally { $hash.Dispose() }
+    $lockPath = Join-Path $locks ($key + '.lock')
+    Assert-NoDeploymentReparse $lockPath
+    try { return [IO.File]::Open($lockPath, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None) }
+    catch [IO.IOException] { throw 'DEPLOYMENT_BUSY: 같은 설치 대상에 다른 설치/제거 작업이 실행 중입니다.' }
+}
+
+function Move-DeploymentDirectory {
+    param([string]$From, [string]$To)
+    Assert-NoDeploymentReparse $From
+    Assert-NoDeploymentReparse $To
+    # Directory.Move fails if To already exists; Move-Item would nest into it.
+    [IO.Directory]::Move($From, $To)
+}
+
+function Test-DeploymentCandidateOwner {
+    param([string]$Root, [string]$InstallId)
+    $manifestPath = Join-Path $Root $script:MinutesManifestName
+    try {
+        Assert-NoDeploymentReparse $manifestPath
+        $receipt = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
+        return $receipt.PSObject.Properties.Name -contains 'install_id' -and $receipt.install_id -ceq $InstallId
+    }
+    catch { return $false }
 }
 
 function Get-DeploymentLinkErrors {

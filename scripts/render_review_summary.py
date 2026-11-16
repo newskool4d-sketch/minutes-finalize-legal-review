@@ -13,9 +13,10 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from approval_contract import REFERENCE_ID, validate_source_contract
+from approval_contract import REFERENCE_ID, validate_approval_spec
 from apply_approved_edits import build_entry_pair
-from hwpx_common import count_structure, read_entry_map, read_json, section_names, sha256_file, validate_basic_hwpx
+from disclosure_package import inspect_disclosure_package
+from hwpx_common import compare_package_metadata, count_structure, section_names, snapshot_hwpx, statement_text_hash, validate_snapshot
 from hwpx_locations import LOCATION_SCHEME, parse_section, validate_location_id
 from render_legal_review_report import DATE, DATE_OR_UNKNOWN, require_string, validate_payload
 from verify_release_pair import compare_entries
@@ -153,7 +154,50 @@ def validate_human_evidence(
     return result
 
 
-def _legal_summary(payload: Any, source_hash: str, entries: dict[str, bytes]) -> tuple[dict[str, str], dict[str, int]]:
+def _paragraph_texts(entries: dict[str, bytes]) -> dict[str, str]:
+    return {paragraph.location_id: paragraph.own_text
+            for index, name in enumerate(section_names(entries)) for paragraph in parse_section(index, entries[name])}
+
+
+def _correction_is_applied(
+    issue: dict[str, Any], specification: dict[str, Any] | None, pair: dict[str, Any] | None,
+    source_texts: dict[str, str],
+) -> bool:
+    """Bind a correction claim to its approved, actually changed paragraph(s)."""
+    if specification is None or pair is None:
+        return False
+    public_only = issue["recommended_scope"] == "정보공개청구용"
+    collection = "redactions" if public_only else "edits"
+    outputs = ("disclosure",) if public_only else ("approval", "disclosure")
+    location = issue["location_id"]
+    before = _paragraph_texts(pair["approval_entries"]) if public_only else source_texts
+    if location not in before:
+        return False
+    after = {output: _paragraph_texts(pair[output + "_entries"]) for output in outputs}
+    if any(location not in texts or texts[location] == before[location] for texts in after.values()):
+        return False
+    for record in specification.get(collection, []):
+        if record.get("approved") is not True or record.get("issue_id") != issue["issue_id"]:
+            continue
+        if "location" in record and record["location"] != location:
+            continue
+        # Paragraph-level audit cannot prove that an earlier correction survived
+        # a later edit to that paragraph. Fail closed instead of treating an
+        # unrelated surviving change as evidence for this issue.
+        last_changes = [next((change for change in reversed(pair[output + "_changes"])
+                              if location in change.get("changed_locations", [])), None)
+                        for output in outputs]
+        if all(change is not None and change["id"] == record["id"]
+               and change["issue_id"] == issue["issue_id"] and change["changed_count"] > 0
+               for change in last_changes):
+            return True
+    return False
+
+
+def _legal_summary(
+    payload: Any, source_hash: str, entries: dict[str, bytes],
+    specification: dict[str, Any] | None = None, pair: dict[str, Any] | None = None,
+) -> tuple[dict[str, str], dict[str, int]]:
     if isinstance(payload, dict) and payload.get("issues") == []:
         # The shared report renderer requires at least one finding. A valid empty
         # review is still unconfirmed here; do not invent a finding to validate it.
@@ -185,10 +229,9 @@ def _legal_summary(payload: Any, source_hash: str, entries: dict[str, bytes]) ->
         states["legal_source_binding"] = _status(states["legal_source_binding"], "PARTIAL")
     elif linked_hash.lower() != source_hash:
         states["legal_source_binding"] = "FAIL"
-    paragraphs = {
-        paragraph.location_id: hashlib.sha256(paragraph.own_text.encode("utf-8")).hexdigest()
-        for index, name in enumerate(section_names(entries)) for paragraph in parse_section(index, entries[name])
-    }
+    source_texts = _paragraph_texts(entries)
+    paragraphs = {location: statement_text_hash(text)
+                  for location, text in source_texts.items()}
     for value in case["event_dates"].values():
         if value == "미확인":
             counts["unknown_case_dates"] += 1
@@ -212,6 +255,8 @@ def _legal_summary(payload: Any, source_hash: str, entries: dict[str, bytes]) ->
         unresolved = bool(counts["unknown_case_dates"]) or issue["confidence"] != "충분"
         resolved_statuses = {"담당자 승인", "수정 반영", "법무 확인", "정보공개 담당 확인"}
         unresolved |= issue["approval_status"] not in resolved_statuses
+        if issue["approval_status"] == "수정 반영":
+            unresolved |= not _correction_is_applied(issue, specification, pair, source_texts)
         if issue["action_code"] == "L" or issue["risk_level"] == "높음":
             unresolved |= issue["approval_status"] != "법무 확인"
         if issue["action_code"] == "V":
@@ -262,6 +307,7 @@ def build_summary(
     paths = {"source": Path(source), "approved_plan": Path(approved), "approval": Path(approval),
              "disclosure": Path(disclosure), "legal_review": Path(legal_review) if legal_review is not None else None}
     hashes: dict[str, str | None] = {key: None for key in ARTIFACTS}
+    captured: dict[str, bytes] = {}
     checks = {key: {"status": "PARTIAL", "code": "NOT_VERIFIED"} for key in CHECKS}
     summary: dict[str, Any] = {
         "schema_version": 1, "quality_result": "PARTIAL", "external_release_authorized": False,
@@ -284,7 +330,8 @@ def build_summary(
             read_state = _status(read_state, "PARTIAL")
             continue
         try:
-            hashes[key] = sha256_file(path)
+            captured[key] = path.read_bytes()
+            hashes[key] = hashlib.sha256(captured[key]).hexdigest()
             summary["artifacts"][key].update(sha256=hashes[key], status="PASS")
         except Exception:
             summary["artifacts"][key]["status"] = "FAIL"
@@ -292,15 +339,21 @@ def build_summary(
     record("artifact_read", read_state, "ARTIFACTS_CURRENT" if read_state == "PASS" else "ARTIFACT_UNAVAILABLE")
     entries: dict[str, bytes] = {}
     pair: dict[str, Any] | None = None
+    specification: dict[str, Any] | None = None
+    packages: dict[str, Any] = {}
+    human_read_failed = False
+    if human_evidence is not None:
+        try:
+            captured["human_evidence"] = Path(human_evidence).read_bytes()
+        except Exception:
+            human_read_failed = True
     try:
-        for path in (paths["source"], paths["approval"], paths["disclosure"]):
-            validate_basic_hwpx(path)
-            infos, entry_map = read_entry_map(path)
-            if len(infos) != len(entry_map):
-                raise ValueError
-        _, entries = read_entry_map(paths["source"])
-        _, approval_entries = read_entry_map(paths["approval"])
-        _, disclosure_entries = read_entry_map(paths["disclosure"])
+        for key in ("source", "approval", "disclosure"):
+            packages[key] = snapshot_hwpx(captured[key])
+            validate_snapshot(packages[key])
+        entries = packages["source"].entries
+        approval_entries = packages["approval"].entries
+        disclosure_entries = packages["disclosure"].entries
         structures = [{name: count_structure(value) for name, value in data.items() if name in section_names(data)}
                       for data in (entries, approval_entries, disclosure_entries)]
         if structures[0] != structures[1] or structures[1] != structures[2]:
@@ -309,17 +362,19 @@ def build_summary(
     except Exception:
         record("package_structure", "FAIL", "STRUCTURE_OR_PACKAGE_INVALID")
     try:
-        specification = read_json(paths["approved_plan"])
-        validate_source_contract(specification, paths["source"])
+        specification = json.loads(captured["approved_plan"].decode("utf-8"))
+        validate_approval_spec(specification, hashes["source"] or "")
         record("source_contract", "PASS", "SOURCE_CONTRACT_VALID")
         pair = build_entry_pair(entries, specification)
         summary["counts"].update(approved_edits=len(pair["approval_changes"]), approved_redactions=len(pair["redactions"]))
         if checks["package_structure"]["status"] != "PASS":
             raise ValueError
-        _, actual_approval = read_entry_map(paths["approval"])
-        _, actual_disclosure = read_entry_map(paths["disclosure"])
+        actual_approval = packages["approval"].entries
+        actual_disclosure = packages["disclosure"].entries
         compare_entries(pair["approval_entries"], actual_approval, "approval")
         compare_entries(pair["disclosure_entries"], actual_disclosure, "disclosure")
+        compare_package_metadata(packages["source"], packages["approval"], disclosure=False)
+        compare_package_metadata(packages["source"], packages["disclosure"], disclosure=True)
         record("technical_pair", "PASS", "SOURCE_RECOMPUTED_PAIR_MATCH")
     except Exception:
         if checks["source_contract"]["status"] != "PASS":
@@ -327,6 +382,10 @@ def build_summary(
         record("technical_pair", "FAIL", "SOURCE_RECOMPUTED_PAIR_MISMATCH")
     if pair is not None:
         package = pair["disclosure_package"]
+        if "disclosure" in packages:
+            package = inspect_disclosure_package(
+                packages["disclosure"].entries, [item["from"] for item in pair["redactions"]],
+                snapshot=packages["disclosure"])
         manual = sorted({item["entry_id"] for item in package["coverage"]["manual_review_entries"]})
         findings = [f"finding-{index}" for index in range(1, len(package["findings"]) + 1)]
         summary["disclosure_package"].update(
@@ -338,7 +397,9 @@ def build_summary(
         summary["counts"].update(manual_package_entries=len(manual), residual_findings=len(findings))
     if legal_review is not None:
         try:
-            legal_states, counts = _legal_summary(read_json(Path(legal_review)), hashes["source"] or "", entries)
+            legal_states, counts = _legal_summary(
+                json.loads(captured["legal_review"].decode("utf-8")), hashes["source"] or "", entries, specification,
+                pair if checks["technical_pair"]["status"] == "PASS" else None)
             summary["counts"].update(counts)
             for key, state in legal_states.items():
                 record(key, state, "LEGAL_RECORD_CHECKED" if state == "PASS" else "LEGAL_RECORD_GAPS")
@@ -346,8 +407,10 @@ def build_summary(
             record("legal_record", "FAIL", "LEGAL_RECORD_INVALID")
     human = None
     try:
+        if human_read_failed:
+            raise ValueError
         if human_evidence is not None:
-            human = read_json(Path(human_evidence))
+            human = json.loads(captured["human_evidence"].decode("utf-8"))
         package_summary = summary["disclosure_package"]
         human_result = validate_human_evidence(human, hashes, package_summary["manual_review_refs"], package_summary["residual_finding_refs"])
         summary["human_evidence"] = human_result
@@ -357,10 +420,11 @@ def build_summary(
         summary["human_evidence"]["status"] = "FAIL"
         record("human_evidence", "FAIL", "HUMAN_EVIDENCE_INVALID")
     stability = "PASS"
-    for key, path in paths.items():
-        if path is not None and hashes[key] is not None:
+    stability_paths = paths | {"human_evidence": Path(human_evidence) if human_evidence is not None else None}
+    for key, path in stability_paths.items():
+        if path is not None and key in captured:
             try:
-                if sha256_file(path) != hashes[key]:
+                if path.read_bytes() != captured[key]:
                     stability = "FAIL"
             except Exception:
                 stability = "FAIL"

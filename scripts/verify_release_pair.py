@@ -8,9 +8,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from approval_contract import validate_source_contract
+from approval_contract import validate_approval_spec
 from apply_approved_edits import build_entry_pair
-from hwpx_common import read_entry_map, read_json, validate_basic_hwpx, write_json
+from disclosure_package import inspect_disclosure_package
+from hwpx_common import compare_package_metadata, read_hwpx_snapshot, read_json, validate_snapshot, write_json
 
 
 def compare_entries(expected: dict[str, bytes], actual: dict[str, bytes], label: str) -> None:
@@ -30,17 +31,24 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        validate_basic_hwpx(args.source)
-        validate_basic_hwpx(args.approval)
-        validate_basic_hwpx(args.disclosure)
+        source = read_hwpx_snapshot(args.source)
+        approval = read_hwpx_snapshot(args.approval)
+        disclosure = read_hwpx_snapshot(args.disclosure)
+        for snapshot in (source, approval, disclosure):
+            validate_snapshot(snapshot)
         specification = read_json(args.approved)
-        validate_source_contract(specification, args.source)
-        _, source_entries = read_entry_map(args.source)
+        validate_approval_spec(specification, source.sha256)
+        source_entries = source.entries
         pair = build_entry_pair(source_entries, specification)
-        _, approval_entries = read_entry_map(args.approval)
-        _, disclosure_entries = read_entry_map(args.disclosure)
+        approval_entries, disclosure_entries = approval.entries, disclosure.entries
         compare_entries(pair["approval_entries"], approval_entries, "결재용")
         compare_entries(pair["disclosure_entries"], disclosure_entries, "정보공개 청구용")
+        compare_package_metadata(source, approval, disclosure=False)
+        compare_package_metadata(source, disclosure, disclosure=True)
+        disclosure_checks = inspect_disclosure_package(
+            disclosure.entries, [item["from"] for item in pair["redactions"]], snapshot=disclosure)
+        disclosure_checks["preview_changes"] = pair["disclosure_package"]["preview_changes"]
+        pair["disclosure_package"] = disclosure_checks
         redaction_ids = {record["id"] for record in pair["redactions"]}
         counts = [row for row in pair["disclosure_changes"] if row["id"] in redaction_ids]
         result = {"status": "ok", "technical_pair_valid": True, "schema_version": 2, "source_sha256": specification["source_sha256"],

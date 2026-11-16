@@ -13,7 +13,7 @@ from typing import Any
 from xml.etree import ElementTree as ET
 from xml.parsers import expat
 
-from hwpx_common import local_name, section_names
+from hwpx_common import HwpxSnapshot, local_name, section_names
 from hwpx_locations import parse_section
 
 
@@ -88,7 +88,8 @@ def _xml_notes(data: bytes) -> list[str]:
     return notes
 
 
-def inspect_disclosure_package(entries: dict[str, bytes], terms: list[str]) -> dict[str, Any]:
+def inspect_disclosure_package(entries: dict[str, bytes], terms: list[str], *,
+                               snapshot: HwpxSnapshot | None = None) -> dict[str, Any]:
     if not isinstance(terms, list) or any(not isinstance(term, str) or not term for term in terms):
         raise ValueError("검사어는 비어 있지 않은 문자열 배열이어야 합니다.")
     terms = list(dict.fromkeys(terms))
@@ -96,6 +97,27 @@ def inspect_disclosure_package(entries: dict[str, bytes], terms: list[str]) -> d
     findings: list[dict[str, Any]] = []
     checked: list[dict[str, str]] = []
     manual: list[dict[str, str]] = []
+
+    if snapshot is not None:
+        if entries != snapshot.entries:
+            raise ValueError("ZIP 검사 바이트와 본문 엔트리가 다릅니다.")
+        metadata = [("zip-archive", "archive-comment", snapshot.archive_comment)]
+        for index, info in enumerate(snapshot.infos, 1):
+            metadata.extend((f"zip-entry-{index}", field, value) for field, value in (
+                ("entry-comment", info.comment), ("central-extra", info.extra),
+                ("local-extra", snapshot.local_extras[info.filename])))
+        for entry_id, field, value in metadata:
+            if not value:
+                continue
+            manual.append({"entry": entry_id, "entry_id": entry_id,
+                           "reason": "zip_metadata_needs_manual_review"})
+            for term_index, term in enumerate(terms):
+                encodings = {term.encode(encoding) for encoding in ("utf-8", "utf-16le", "utf-16be")}
+                count = max(value.count(encoded) for encoded in encodings)
+                if count:
+                    findings.append({"entry": entry_id, "entry_id": entry_id,
+                                     "location_id": f"{entry_id}/{field}",
+                                     "term_id": f"term-{term_index + 1}", "match_count": count})
 
     for index, (name, data) in enumerate(entries.items(), 1):
         entry_id = f"zip-entry-{index}"
@@ -163,8 +185,9 @@ def inspect_disclosure_package(entries: dict[str, bytes], terms: list[str]) -> d
 
     return {
         "findings": findings,
-        "coverage": {"terms_configured": len(terms), "checked_entries": checked, "manual_review_entries": manual},
-        "configured_terms_check_pass": bool(terms) and not findings and not manual,
+        "coverage": {"terms_configured": len(terms), "checked_entries": checked, "manual_review_entries": manual,
+                     "zip_metadata_checked": snapshot is not None},
+        "configured_terms_check_pass": bool(terms) and not findings and not manual and snapshot is not None,
         "release_ready": False,
         "readiness_note": "설정된 검사어만 검사했습니다. 자동검사·쌍 일치는 정보공개 판단이나 한글 실물 확인을 대체하지 않습니다.",
     }

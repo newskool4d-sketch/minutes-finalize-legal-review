@@ -30,10 +30,17 @@ jobs:
 
   windows-install:
     runs-on: windows-latest
+    env:
+      MINUTES_STRICT_WINDOWS_TESTS: "1"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Test isolated PowerShell installation and recovery
+      - name: Require both Windows PowerShell runtimes
+        shell: pwsh
+        run: |
+          Get-Command pwsh.exe -ErrorAction Stop
+          Get-Command powershell.exe -ErrorAction Stop
+      - name: Test isolated PowerShell installation and recovery (no skips)
         run: python -m unittest discover -s tests -p test_installation.py -v

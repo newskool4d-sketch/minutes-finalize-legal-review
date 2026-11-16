@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 from xml.etree import ElementTree as ET
 
-from hwpx_common import read_json, read_entry_map, validate_basic_hwpx, write_json
+from hwpx_common import read_json, read_hwpx_snapshot, validate_snapshot, write_json
 from hwpx_locations import LOCATION_SCHEME
 from disclosure_package import inspect_disclosure_package
 
@@ -21,7 +21,8 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        validate_basic_hwpx(args.input)
+        snapshot = read_hwpx_snapshot(args.input)
+        validate_snapshot(snapshot, args.input)
         configured = read_json(args.terms)
         terms = configured["terms"] if isinstance(configured, dict) else configured
         if not isinstance(terms, list) or not all(isinstance(term, str) and term for term in terms):
@@ -29,8 +30,7 @@ def main() -> int:
         if args.output.exists():
             raise FileExistsError(f"출력 파일이 이미 존재합니다: {args.output}")
 
-        _, entries = read_entry_map(args.input)
-        report = inspect_disclosure_package(entries, terms)
+        report = inspect_disclosure_package(snapshot.entries, terms, snapshot=snapshot)
         findings = report["findings"]
         write_json(args.output, {"location_scheme": LOCATION_SCHEME, "input": str(args.input), **report})
     except (OSError, ValueError, ET.ParseError) as exc:

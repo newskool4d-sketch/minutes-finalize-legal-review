@@ -64,7 +64,7 @@ py -X utf8 scripts/extract_minutes_model.py "$caseRoot/회의록_1차수정.hwpx
 }
 ```
 
-일반 `edits`의 `scope` 값은 `both` 또는 `approval`만 사용한다. 이 수정은 두 HWPX에 동일하게 적용된다. 정보공개 청구용에만 적용하는 식별정보 처리는 반드시 `redactions`에 `scope: "disclosure"`로 기록한다. `from`은 지정 문단의 자체 텍스트와 정확히 일치하는 문구여야 한다. 결과 파일이 이미 있거나 치환 횟수가 `min_matches`보다 작으면 도구가 중단한다.
+일반 `edits`의 `scope` 값은 `both` 또는 `approval`만 사용한다. 이 수정은 두 HWPX에 동일하게 적용된다. `edits`에는 `redaction_type`을 넣지 않는다. 정보공개 청구용에만 적용하는 식별정보·문장 비공개 처리는 반드시 `redactions`에 `scope: "disclosure"`로 기록한다. 공개용 가림을 일반 수정에 섞은 계획은 생성 전에 거부한다. `from`은 지정 문단의 자체 텍스트와 정확히 일치하는 문구여야 한다. 결과 파일이 이미 있거나 치환 횟수가 `min_matches`보다 작으면 도구가 중단한다.
 
 ### N04 공통 좌표·치환 계약
 
@@ -140,7 +140,7 @@ py -X utf8 scripts/verify_release_pair.py `
   --approved "$caseRoot/approved-edits.json"
 ```
 
-`verify_release_pair.py`는 실제 원본 해시를 승인 목록과 대조하고, 생성기와 공유하는 `build_entry_pair(entries, specification)` 계산으로 일반 수정과 비실명 처리를 재현한 뒤 두 HWPX의 모든 ZIP 엔트리 바이트를 각각 대조한다. 두 산출물에 같은 무승인 변경이 들어가도 실패한다. `--source`는 필수다.
+`verify_release_pair.py`는 실제 원본 해시를 승인 목록과 대조하고, 생성기와 공유하는 `build_entry_pair(entries, specification)` 계산으로 일반 수정과 비실명 처리를 재현한 뒤 두 HWPX의 모든 ZIP 엔트리 바이트와 ZIP 주석·확장 필드를 각각 대조한다. 두 산출물에 같은 무승인 변경이 들어가도 실패한다. 중복 ZIP 엔트리명은 공통 읽기 단계에서 거부한다. `--source`는 필수다.
 
 `apply_approved_edits.py`는 텍스트가 변경된 산출물의 `hp:linesegarray` 레이아웃 캐시를 결재용·정보공개용 모두에서 제거한다. 한글은 열 때 캐시를 다시 계산하므로, 변경 전 문장 길이를 기준으로 남은 캐시 때문에 열기 오류가 생기는 것을 막기 위한 조치다. 변경이력의 `layout_cache`에서 제거 건수를 확인한다.
 
@@ -156,6 +156,10 @@ py -X utf8 scripts/scan_sensitive_content.py "$caseRoot/회의록_결재용_실�
 ## 5. 미리보기·비본문 검사와 공개 준비 상태
 
 정보공개용은 표준 `Preview/PrvText.txt`와 `Preview/PrvImage.png`를 중립 안내문·흰색 썸네일로 교체한다. 입력본과 결재용의 미리보기는 보존한다. 이는 본문 가림 뒤 미리보기에 원문이 남는 것을 방지하는 패키지 처리이며, 본문이나 기타 첨부의 자동 삭제 기능이 아니다.
+
+정보공개용 ZIP의 패키지 주석·엔트리 주석·확장 필드는 제거한다. 문서 본문과 관계없는 ZIP 영역에 식별정보가 남는 것을 막기 위한 고정 처리다. 결재용은 원본 패키지/엔트리 주석과 확장 필드를 보존하며, 공개용에 이 정보가 다시 들어가면 쌍 검사가 실패한다. HWPX 내부 XML 메타데이터·이미지·첨부까지 일괄 삭제하는 정책은 아니다.
+
+원본 ZIP의 로컬 헤더와 중앙 디렉터리 확장 필드가 서로 다르면 현재 보존 방식으로 그대로 재작성할 수 없으므로 두 파일 생성 전에 중단한다. 이런 패키지는 자동 정규화하거나 메타데이터를 조용히 버리지 않고 별도 확인 대상으로 남긴다.
 
 표준 미리보기 자원을 본문에서도 직접 또는 매니페스트 ID로 참조하는 특수 문서는 자동 교체를 중단한다. 이 경우 담당자가 본문 자원을 분리·확인한 뒤 다시 처리해야 하며, 도구가 본문 그림까지 흰색으로 바꾸지 않는다.
 

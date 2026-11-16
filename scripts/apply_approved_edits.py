@@ -17,21 +17,21 @@ from approval_contract import (
     REAL_SCOPES,
     approval_metadata,
     validate_approval_spec,
-    validate_source_contract,
 )
 from hwpx_common import (
-    read_entry_map,
+    read_hwpx_snapshot,
+    require_preservable_metadata,
     read_json,
     replace_text_nodes,
     replace_paragraph_text,
     section_names,
-    sha256_file,
     strip_stale_linesegarrays,
     validate_basic_hwpx,
+    validate_snapshot,
     write_json,
     write_preserving_zip,
 )
-from hwpx_locations import validate_location_id
+from hwpx_locations import parse_section, validate_location_id
 from disclosure_package import inspect_disclosure_package, neutralize_disclosure_previews
 
 def selected(records: list[dict[str, Any]], scopes: set[str]) -> list[dict[str, Any]]:
@@ -73,6 +73,7 @@ def apply_records(
     updated = dict(entries)
     audit: list[dict[str, Any]] = []
     for record in records:
+        before_record = dict(updated)
         source, replacement = require_replacement(record)
         total = 0
         per_file: dict[str, int] = {}
@@ -122,6 +123,13 @@ def apply_records(
                 "scope": record.get("scope", "both"),
                 "changed_count": total,
                 "files": per_file,
+                "changed_locations": [
+                    after.location_id
+                    for section_index, filename in enumerate(section_files) if filename in per_file
+                    for before, after in zip(parse_section(section_index, before_record[filename]),
+                                             parse_section(section_index, updated[filename]))
+                    if before.own_text != after.own_text
+                ],
                 "reason": record.get("reason", ""),
                 **approval_metadata(record),
             }
@@ -215,21 +223,28 @@ def main() -> int:
         return 1
 
     try:
-        validate_basic_hwpx(source)
+        snapshot = read_hwpx_snapshot(source)
+        validate_snapshot(snapshot, source)
+        require_preservable_metadata(snapshot)
         specification = read_json(args.approved)
-        validate_source_contract(specification, source)
-        infos, entries = read_entry_map(source)
+        validate_approval_spec(specification, snapshot.sha256)
+        infos, entries = snapshot.infos, snapshot.entries
         pair = build_entry_pair(entries, specification)
-        write_preserving_zip(args.approval_output, infos, pair["approval_entries"])
-        write_preserving_zip(args.disclosure_output, infos, pair["disclosure_entries"])
+        write_preserving_zip(args.approval_output, infos, pair["approval_entries"], archive_comment=snapshot.archive_comment)
+        write_preserving_zip(args.disclosure_output, infos, pair["disclosure_entries"], disclosure=True)
         approval_validation = validate_basic_hwpx(args.approval_output)
-        disclosure_validation = validate_basic_hwpx(args.disclosure_output)
+        disclosure_snapshot = read_hwpx_snapshot(args.disclosure_output)
+        disclosure_validation = validate_snapshot(disclosure_snapshot, args.disclosure_output)
+        disclosure_checks = inspect_disclosure_package(
+            disclosure_snapshot.entries, [item["from"] for item in pair["redactions"]], snapshot=disclosure_snapshot)
+        disclosure_checks["preview_changes"] = pair["disclosure_package"]["preview_changes"]
+        pair["disclosure_package"] = disclosure_checks
 
         write_json(
             args.audit,
             {
                 "schema_version": 2,
-                "source_sha256": sha256_file(source),
+                "source_sha256": snapshot.sha256,
                 "approval_output": {"path": str(args.approval_output), "sha256": approval_validation["sha256"]},
                 "disclosure_output": {"path": str(args.disclosure_output), "sha256": disclosure_validation["sha256"]},
                 "approval_changes": pair["approval_changes"],

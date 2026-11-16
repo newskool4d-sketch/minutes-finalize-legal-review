@@ -36,6 +36,7 @@ if (-not $Apply) {
 
 $oldMoved = $false
 $newMoved = $false
+$deploymentLock = Enter-DeploymentLock $dest.Path $dest.Storage
 try {
     # Inspect an existing tree before any mutation; extras are retained in the backup.
     if (Test-Path -LiteralPath $dest.Path) { $null = @(Get-DeploymentTreeFiles $dest.Path) }
@@ -48,7 +49,7 @@ try {
         [IO.File]::Copy($from, $to, $false)
         Invoke-DeploymentTestFailure 'copy'
     }
-    $manifest = New-DeploymentManifest $entries
+    $manifest = New-DeploymentManifest $entries $token
     $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $stage $script:MinutesManifestName) -Encoding UTF8
     Invoke-DeploymentTestFailure 'verify'
     $check = Test-DeploymentInstallation $stage $source $entries
@@ -61,11 +62,11 @@ try {
     Assert-NoDeploymentReparse $dest.Storage
     New-Item -ItemType Directory -Path $dest.Root -Force | Out-Null
     if (Test-Path -LiteralPath $dest.Path) {
-        Move-Item -LiteralPath $dest.Path -Destination $backup
+        Move-DeploymentDirectory $dest.Path $backup
         $oldMoved = $true
     }
     Invoke-DeploymentTestFailure 'swap'
-    Move-Item -LiteralPath $stage -Destination $dest.Path
+    Move-DeploymentDirectory $stage $dest.Path
     $newMoved = $true
     Invoke-DeploymentTestFailure 'after-swap'
     $final = Test-DeploymentInstallation $dest.Path $source $fresh
@@ -74,17 +75,24 @@ try {
 catch {
     $failure = $_
     if ($newMoved -and (Test-Path -LiteralPath $dest.Path)) {
-        $failed = Join-Path $dest.Storage ('failed-' + $token)
-        Move-Item -LiteralPath $dest.Path -Destination $failed
-        Write-Output "실패 후보 보존: $failed"
+        if (Test-DeploymentCandidateOwner $dest.Path $token) {
+            $failed = Join-Path $dest.Storage ('failed-' + $token)
+            Move-DeploymentDirectory $dest.Path $failed
+            Write-Output "실패 후보 보존: $failed"
+        }
+        else { Write-Warning '설치 대상의 소유권이 달라져 이동하지 않았습니다. 기존본은 백업에서 보존됩니다.' }
     }
     if ($oldMoved) {
-        Move-Item -LiteralPath $backup -Destination $dest.Path
-        Write-Output "기존 설치 복원: $($dest.Path)"
+        if (-not (Test-Path -LiteralPath $dest.Path)) {
+            Move-DeploymentDirectory $backup $dest.Path
+            Write-Output "기존 설치 복원: $($dest.Path)"
+        }
+        else { Write-Warning "활성 대상이 존재하여 복원하지 않았습니다. 기존본 보존: $backup" }
     }
     if (Test-Path -LiteralPath $stage) { Write-Output "미완성 스테이징 보존: $stage" }
     throw $failure
 }
+finally { $deploymentLock.Dispose() }
 if ($oldMoved) { Write-Output "BACKUP_PATH: $backup" }
 Write-Output "설치 완료: $($dest.Path)"
 Write-Output "VERIFY_COMMAND: $command"

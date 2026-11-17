@@ -296,20 +296,23 @@ function Invoke-DeploymentTestFailure {
         result = self.install("-Apply")
         command = next(line.removeprefix("VERIFY_COMMAND: ") for line in result.stdout.splitlines()
                        if line.startswith("VERIFY_COMMAND: "))
-        self.assertIn(str(self.dest), command)
+        # The hosted runner can expose TEMP through an 8.3 alias; PowerShell prints the long path.
+        destination = str(self.dest.resolve(strict=True)).replace("'", "''")
+        self.assertIn(os.path.normcase(f"-DestinationRoot '{destination}' "), os.path.normcase(command))
         executed = subprocess.run([str(PWSH), "-NoProfile", "-NonInteractive", "-Command", command],
                                   cwd=self.work, capture_output=True, text=True, encoding="utf-8",
                                   errors="replace", timeout=90)
         self.assertEqual(executed.returncode, 0, executed.stdout + executed.stderr)
-        self.assertEqual(json.loads(executed.stdout)["path"], str(self.installed))
+        self.assertTrue(self.installed.samefile(Path(json.loads(executed.stdout)["path"])))
 
     def test_uninstall_preview_and_apply_moves_complete_tree(self) -> None:
         self.install("-Apply")
-        (self.installed / "local note.txt").write_text("keep", encoding="utf-8")
+        note = self.installed / "local note.txt"
+        note.write_text("keep", encoding="utf-8")
         before = tree_hashes(self.work)
         preview = self.run_ps("uninstall.ps1", "-DestinationRoot", str(self.dest))
         self.assertEqual(tree_hashes(self.work), before)
-        self.assertIn(os.path.normcase(str(self.installed / "local note.txt")), os.path.normcase(preview.stdout))
+        self.assertIn(os.path.normcase(str(note.resolve(strict=True))), os.path.normcase(preview.stdout).splitlines())
         previous = tree_hashes(self.installed)
         result = self.run_ps("uninstall.ps1", "-DestinationRoot", str(self.dest), "-Apply")
         backup = Path(next(line.removeprefix("BACKUP_PATH: ") for line in result.stdout.splitlines()

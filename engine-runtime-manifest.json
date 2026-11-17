@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "protocol_version": 1,
+  "entrypoint": "scripts/minutes_engine.py",
+  "include": [
+    "VERSION",
+    "LICENSE",
+    "engine-runtime-manifest.json",
+    "profiles/education-rights-ko.md",
+    "profiles/generic-committee-ko.md",
+    "profiles/legal-profiles.json",
+    "profiles/school-violence-ko.md",
+    "references/m2-legal-profile-evidence.md",
+    "scripts/legal_profiles.py",
+    "scripts/minutes_engine.py",
+    "scripts/approval_contract.py",
+    "scripts/apply_approved_edits.py",
+    "scripts/detect_legal_review_candidates.py",
+    "scripts/disclosure_package.py",
+    "scripts/hwpx_common.py",
+    "scripts/hwpx_locations.py",
+    "scripts/render_legal_review_report.py",
+    "scripts/render_review_summary.py",
+    "scripts/verify_release_pair.py"
+  ]
+}

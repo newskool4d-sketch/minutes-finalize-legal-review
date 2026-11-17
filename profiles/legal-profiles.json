@@ -1,0 +1,948 @@
+{
+  "schema_version": 1,
+  "catalog_version": "2026.11.16.1",
+  "checked_on": "2026-11-16",
+  "profiles": [
+    {
+      "id": "education-rights-ko",
+      "version": "2026.11.16.1",
+      "committee_type": "education_rights",
+      "jurisdiction": "KR",
+      "sources": [
+        {
+          "id": "edu-definition",
+          "law_name": "교원의 지위 향상 및 교육활동 보호를 위한 특별법",
+          "kind": "법률",
+          "official_url": "https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=283357&efYd=20260219",
+          "mst": "283357",
+          "promulgated_on": "2026-02-19",
+          "effective_from": "2026-02-19",
+          "effective_to_exclusive": "2026-11-20",
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제19조"
+          ],
+          "temporal_basis": [
+            "incident_date"
+          ],
+          "summary": "교육활동 침해 유형과 행위 주체를 구분하여 사실자료를 대조한다.",
+          "transition_notes": "법률 제21350호 현행 확인본. 제21655호 2026-11-20, 제21717호 2026-12-03 시행예정본은 자동 적용하지 않는다."
+        },
+        {
+          "id": "edu-procedure",
+          "law_name": "교원의 지위 향상 및 교육활동 보호를 위한 특별법",
+          "kind": "법률",
+          "official_url": "https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=283357&efYd=20260219",
+          "mst": "283357",
+          "promulgated_on": "2026-02-19",
+          "effective_from": "2026-02-19",
+          "effective_to_exclusive": "2026-11-20",
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제25조제6항",
+            "제26조제3항"
+          ],
+          "temporal_basis": [
+            "deliberation_date"
+          ],
+          "summary": "학생 또는 보호자 의견진술과 보호자 등 조치 대상의 의견진술 절차를 각각 확인한다.",
+          "transition_notes": "심의일의 절차법과 기관 운영기준을 사건별로 확인한다. 과거 시행본은 이 카탈로그에 포함하지 않았다."
+        },
+        {
+          "id": "edu-measures",
+          "law_name": "교원의 지위 향상 및 교육활동 보호를 위한 특별법",
+          "kind": "법률",
+          "official_url": "https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=283357&efYd=20260219",
+          "mst": "283357",
+          "promulgated_on": "2026-02-19",
+          "effective_from": "2026-02-19",
+          "effective_to_exclusive": "2026-11-20",
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제25조제2항",
+            "제25조제3항",
+            "제25조제7항",
+            "제26조제2항"
+          ],
+          "temporal_basis": [
+            "incident_date",
+            "disposition_date"
+          ],
+          "summary": "교권 학생 조치는 전학 제6호·퇴학 제7호이며 의무교육 퇴학 제한과 조치 주체를 대조한다. 보호자 조치는 학생 조치와 분리한다.",
+          "transition_notes": "제재기준 적용은 부칙과 사건별 법무 검토가 필요하다. 두 날짜의 버전 범위 일치는 적용법 확정이 아니다."
+        },
+        {
+          "id": "edu-emergency",
+          "law_name": "교원의 지위 향상 및 교육활동 보호를 위한 특별법",
+          "kind": "법률",
+          "official_url": "https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=283357&efYd=20260219",
+          "mst": "283357",
+          "promulgated_on": "2026-02-19",
+          "effective_from": "2026-02-19",
+          "effective_to_exclusive": "2026-11-20",
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제25조제9항부터 제13항",
+            "부칙 제21350호 제2조"
+          ],
+          "temporal_basis": [
+            "knowledge_date",
+            "disposition_date"
+          ],
+          "summary": "긴급조치의 요건·학교장 통지·즉시 보고와 추인·의견진술을 확인한다.",
+          "transition_notes": "2026-02-19 이후 학교장이 침해행위를 알게 된 경우부터 신설 조항 적용. knowledge_date는 학교장 인지일이며 사건 발생일로 대체하지 않는다."
+        },
+        {
+          "id": "edu-records",
+          "law_name": "교원의 지위 향상 및 교육활동 보호를 위한 특별법",
+          "kind": "법률",
+          "official_url": "https://www.law.go.kr/LSW/lsInfoP.do?lsiSeq=283357&efYd=20260219",
+          "mst": "283357",
+          "promulgated_on": "2026-02-19",
+          "effective_from": "2026-02-19",
+          "effective_to_exclusive": "2026-11-20",
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제27조",
+            "제30조"
+          ],
+          "temporal_basis": [
+            "deliberation_date"
+          ],
+          "summary": "축소·은폐 금지, 비밀유지와 당사자 회의록 열람·복사 절차를 함께 검토한다.",
+          "transition_notes": "제30조제3항의 신청권자와 일반 정보공개청구를 구별한다. 실제 공개 판단에는 청구인 지위·청구일·정보공개 법령을 별도 확인한다."
+        },
+        {
+          "id": "edu-quorum",
+          "law_name": "교원의 지위 향상 및 교육활동 보호를 위한 특별법 시행령",
+          "kind": "대통령령",
+          "official_url": "https://www.law.go.kr/lsInfoP.do?lsiSeq=273699",
+          "mst": "273699",
+          "promulgated_on": "2025-09-16",
+          "effective_from": "2025-09-19",
+          "effective_to_exclusive": null,
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제13조",
+            "제15조제5항",
+            "제15조의2",
+            "제16조"
+          ],
+          "temporal_basis": [
+            "deliberation_date"
+          ],
+          "summary": "제척·기피·회피, 재적/출석/찬성 수와 본위원회·소위원회의 위임 및 운영기준을 확인한다.",
+          "transition_notes": "대통령령 제35745호. 소위원회 운영은 관할 기준을 별도 확보해야 하며 전체 위원 정수를 자동 대입하지 않는다."
+        },
+        {
+          "id": "edu-assessment",
+          "law_name": "교원의 지위 향상 및 교육활동 보호를 위한 특별법 시행령",
+          "kind": "대통령령",
+          "official_url": "https://www.law.go.kr/lsInfoP.do?lsiSeq=273699",
+          "mst": "273699",
+          "promulgated_on": "2025-09-16",
+          "effective_from": "2025-09-19",
+          "effective_to_exclusive": null,
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제22조제1항"
+          ],
+          "temporal_basis": [
+            "incident_date",
+            "deliberation_date"
+          ],
+          "summary": "심각성·지속성·고의성, 반성·선도 가능성, 학생과 피해교원의 관계회복, 피해교원의 임신·장애 및 학생 장애 요소를 대조한다.",
+          "transition_notes": "현재 확인 버전 이전 사건은 연혁 시행령 확인이 필요하다. 요소의 존재가 자동 가중·감경을 뜻하지 않는다."
+        },
+        {
+          "id": "edu-confidentiality",
+          "law_name": "교원의 지위 향상 및 교육활동 보호를 위한 특별법 시행령",
+          "kind": "대통령령",
+          "official_url": "https://www.law.go.kr/lsInfoP.do?lsiSeq=273699",
+          "mst": "273699",
+          "promulgated_on": "2025-09-16",
+          "effective_from": "2025-09-19",
+          "effective_to_exclusive": null,
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제24조"
+          ],
+          "temporal_basis": [
+            "deliberation_date"
+          ],
+          "summary": "학생·교원 및 가족 개인정보, 심의·의결의 개인별 발언, 명백한 분쟁 유발 우려 사항의 비밀 범위를 확인한다.",
+          "transition_notes": "법 제30조와 함께 검토하며 이 규정만으로 문장 전체 비공개나 원 회의록 삭제를 자동 결정하지 않는다."
+        },
+        {
+          "id": "edu-notice",
+          "law_name": "교육활동 침해 행위 및 조치 기준에 관한 고시",
+          "kind": "교육부고시",
+          "official_url": "https://www.law.go.kr/admRulInfoP.do?admRulSeq=2100000246418",
+          "mst": "2100000246418",
+          "promulgated_on": "2024-08-30",
+          "effective_from": "2024-08-30",
+          "effective_to_exclusive": null,
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제2조",
+            "제3조",
+            "별표",
+            "부칙 제2024-20호"
+          ],
+          "temporal_basis": [
+            "incident_date",
+            "deliberation_date"
+          ],
+          "summary": "침해행위 유형, 판단요소, 가중·감경 의결 및 전학·퇴학 선행요건과 예외를 별표와 대조한다.",
+          "transition_notes": "교육부고시 제2024-20호는 발령일 시행. 최초 사안 전학·퇴학 제한에는 범죄유형 등에 따른 예외가 있어 절대 금지로 판정하지 않는다. 점수 자동 산정 제외."
+        }
+      ],
+      "rules": [
+        {
+          "id": "edu-activity-elements",
+          "pattern": "교육활동|교권|정당한 생활지도|반복.{0,12}민원",
+          "issue_types": [
+            "사실인정",
+            "법적 근거"
+          ],
+          "risk_level": "중간",
+          "action_code": "V",
+          "source_ids": [
+            "edu-definition",
+            "edu-notice"
+          ],
+          "factors": [
+            "교육활동 중 여부",
+            "행위 주체와 침해 유형"
+          ],
+          "evidence_to_check": [
+            "사안별 행위와 교육활동 자료",
+            "반대 진술과 객관자료"
+          ],
+          "reason": "민원·불응이라는 말만으로 침해를 확정하지 말고 구체적 행위와 법적 유형을 대조한다."
+        },
+        {
+          "id": "edu-opportunity",
+          "pattern": "의견.{0,3}진술|불참|서면|보호자",
+          "issue_types": [
+            "절차"
+          ],
+          "risk_level": "중간",
+          "action_code": "V",
+          "source_ids": [
+            "edu-procedure"
+          ],
+          "factors": [
+            "학생 또는 보호자 의견진술",
+            "보호자 등 조치의 별도 절차"
+          ],
+          "evidence_to_check": [
+            "출석·통지 자료",
+            "서면 제출 및 고려 기록"
+          ],
+          "reason": "불참·서면이라는 표현만으로 진술권 보장 또는 위반을 단정하지 않는다."
+        },
+        {
+          "id": "edu-transfer-expulsion",
+          "pattern": "전학|퇴학|6호|7호",
+          "issue_types": [
+            "재량판단",
+            "법적 근거"
+          ],
+          "risk_level": "높음",
+          "action_code": "L",
+          "source_ids": [
+            "edu-measures",
+            "edu-notice"
+          ],
+          "factors": [
+            "교권 전학 제6호",
+            "교권 퇴학 제7호",
+            "선행요건과 예외"
+          ],
+          "evidence_to_check": [
+            "동일교 재학 중 선행 조치 자료",
+            "최초 사안 예외 해당 근거",
+            "의무교육 대상 여부"
+          ],
+          "reason": "학폭의 전학·퇴학 번호와 혼용하지 않고 고시의 제한·예외 및 의무교육 제한을 확인한다."
+        },
+        {
+          "id": "edu-guardian-measure",
+          "pattern": "보호자.{0,20}조치|서면사과|재발방지",
+          "issue_types": [
+            "절차",
+            "법적 근거"
+          ],
+          "risk_level": "중간",
+          "action_code": "V",
+          "source_ids": [
+            "edu-measures",
+            "edu-procedure"
+          ],
+          "factors": [
+            "보호자 등과 학생 조치 구분"
+          ],
+          "evidence_to_check": [
+            "행위 주체별 사실",
+            "보호자 의견진술 기록"
+          ],
+          "reason": "학생에게 적용하는 조치 체계를 보호자에게 그대로 대입하지 않는다."
+        },
+        {
+          "id": "edu-emergency-ratification",
+          "pattern": "긴급|추인|우선.{0,10}출석정지",
+          "issue_types": [
+            "절차",
+            "법적 근거"
+          ],
+          "risk_level": "높음",
+          "action_code": "L",
+          "source_ids": [
+            "edu-emergency"
+          ],
+          "factors": [
+            "학교장 인지일",
+            "긴급 요건",
+            "즉시 보고·추인"
+          ],
+          "evidence_to_check": [
+            "인지일 확인 자료",
+            "통지·보고·추인 및 진술 기록"
+          ],
+          "reason": "발생일만으로 2026년 신설 긴급조치를 적용하지 않고 부칙의 인지일 기준을 확인한다."
+        },
+        {
+          "id": "edu-assessment-factors",
+          "pattern": "심각성|지속성|고의성|선도 가능성|관계.?회복|임신|장애|점수",
+          "issue_types": [
+            "재량판단",
+            "사실인정"
+          ],
+          "risk_level": "중간",
+          "action_code": "V",
+          "source_ids": [
+            "edu-assessment",
+            "edu-notice"
+          ],
+          "factors": [
+            "교원과 학생의 관계회복",
+            "반성 및 선도 가능성",
+            "추가 판단 요소"
+          ],
+          "evidence_to_check": [
+            "요소별 객관 근거",
+            "반대·유리한 자료",
+            "가중·감경 의결 기록"
+          ],
+          "reason": "기본·추가 요소를 자료와 연결하고 장애·임신 등으로 조치를 자동 산정하지 않는다."
+        },
+        {
+          "id": "edu-quorum-conflict",
+          "pattern": "정족수|표결|재적|소위원회|제척|기피|회피",
+          "issue_types": [
+            "절차",
+            "기록무결성"
+          ],
+          "risk_level": "중간",
+          "action_code": "V",
+          "source_ids": [
+            "edu-quorum"
+          ],
+          "factors": [
+            "실제 심의 단위",
+            "위원별 참여 자격"
+          ],
+          "evidence_to_check": [
+            "위원 명부·위임 범위",
+            "제척·기피·회피 처리",
+            "본표결과 결과표"
+          ],
+          "reason": "관할 운영기준과 실제 심의 단위를 확인하여 정족수·표결·참여 기록을 대조한다."
+        },
+        {
+          "id": "edu-record-integrity",
+          "pattern": "회의록|삭제|가림|비공개|공개|문제.{0,5}발언",
+          "issue_types": [
+            "기록무결성",
+            "개인정보"
+          ],
+          "risk_level": "높음",
+          "action_code": "L",
+          "source_ids": [
+            "edu-records",
+            "edu-confidentiality"
+          ],
+          "factors": [
+            "원기록 보존",
+            "당사자 열람과 제3자 공개 구분"
+          ],
+          "evidence_to_check": [
+            "원문·수정 이력",
+            "청구인 지위와 공개 담당자 판단"
+          ],
+          "reason": "문제가 될 수 있다는 이유로 증거성 발언을 지우지 않는다. 결재본 수정과 공개본 가림을 별도 승인한다."
+        }
+      ],
+      "required_checks": [
+        {
+          "id": "edu-check-evidence",
+          "source_ids": [
+            "edu-definition"
+          ],
+          "evidence_to_check": [
+            "사안·행위자별 사실자료",
+            "반대·유리한 진술"
+          ],
+          "reason": "규칙 미탐지를 적법성 또는 사실확정의 증거로 삼지 않는다."
+        },
+        {
+          "id": "edu-check-procedure",
+          "source_ids": [
+            "edu-procedure",
+            "edu-quorum"
+          ],
+          "evidence_to_check": [
+            "시나리오·통지·진술 자료",
+            "위원 명부·관할 소위원회 기준·표결지"
+          ],
+          "reason": "회의록만으로 절차 누락 여부를 완결 판단하지 않는다."
+        },
+        {
+          "id": "edu-check-measures",
+          "source_ids": [
+            "edu-measures",
+            "edu-assessment",
+            "edu-notice"
+          ],
+          "evidence_to_check": [
+            "별표 원문",
+            "요소별 판단 근거·의결서",
+            "학교급·과거 조치 및 예외 증빙"
+          ],
+          "reason": "교권 전용 조치 근거를 확인하되 처분·점수 자동 결정을 하지 않는다."
+        },
+        {
+          "id": "edu-check-transition",
+          "source_ids": [
+            "edu-emergency"
+          ],
+          "evidence_to_check": [
+            "학교장 인지일",
+            "긴급조치 해당 여부",
+            "당시 부칙·경과조치"
+          ],
+          "reason": "비해당이면 담당자가 비해당 근거를 기록한다. 날짜를 추정하여 적용례를 통과시키지 않는다."
+        },
+        {
+          "id": "edu-check-disclosure",
+          "source_ids": [
+            "edu-records",
+            "edu-confidentiality"
+          ],
+          "evidence_to_check": [
+            "결재본 원문",
+            "청구인 지위·청구일",
+            "비실명·문장 비공개 별도 판단"
+          ],
+          "reason": "비실명 파일 생성과 법적 공개 가능 판단을 구분한다."
+        }
+      ]
+    },
+    {
+      "id": "school-violence-ko",
+      "version": "2026.11.16.1",
+      "committee_type": "school_violence",
+      "jurisdiction": "KR",
+      "sources": [
+        {
+          "id": "sv-definition",
+          "law_name": "학교폭력예방 및 대책에 관한 법률",
+          "kind": "법률",
+          "official_url": "https://www.law.go.kr/LSW/lsInfoR.do?ancYnChk=0&chrClsCd=010202&efYd=20260602&lsiSeq=286361",
+          "mst": "286361",
+          "promulgated_on": "2026-06-02",
+          "effective_from": "2026-06-02",
+          "effective_to_exclusive": "2027-01-01",
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제2조",
+            "제3조",
+            "제12조"
+          ],
+          "temporal_basis": [
+            "incident_date"
+          ],
+          "summary": "학생을 대상으로 한 행위·피해와 각 학생의 관여를 사안별로 구분하고 권리침해에 주의하여 검토한다.",
+          "transition_notes": "법률 제21723호 2026-06-02 시행본. 동일 MST의 2027-01-01 시행예정본은 제15조의2 유예가 포함된 다른 시행본이므로 자동 적용하지 않는다."
+        },
+        {
+          "id": "sv-records-procedure",
+          "law_name": "학교폭력예방 및 대책에 관한 법률",
+          "kind": "법률",
+          "official_url": "https://www.law.go.kr/LSW/lsInfoR.do?ancYnChk=0&chrClsCd=010202&efYd=20260602&lsiSeq=286361",
+          "mst": "286361",
+          "promulgated_on": "2026-06-02",
+          "effective_from": "2026-06-02",
+          "effective_to_exclusive": "2027-01-01",
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제13조제3항부터 제5항",
+            "제16조제2항",
+            "제17조제8항"
+          ],
+          "temporal_basis": [
+            "deliberation_date"
+          ],
+          "summary": "회의 일시·장소·출석·토의·의결 기록, 양측 통지·의견진술 및 요청 시 전문가 의견청취를 확인한다.",
+          "transition_notes": "법률상 요청 주체와 요건을 확인한다. 불참·서면·기록 단어만으로 절차 이행 또는 위반을 확정하지 않는다."
+        },
+        {
+          "id": "sv-measures",
+          "law_name": "학교폭력예방 및 대책에 관한 법률",
+          "kind": "법률",
+          "official_url": "https://www.law.go.kr/LSW/lsInfoR.do?ancYnChk=0&chrClsCd=010202&efYd=20260602&lsiSeq=286361",
+          "mst": "286361",
+          "promulgated_on": "2026-06-02",
+          "effective_from": "2026-06-02",
+          "effective_to_exclusive": "2027-01-01",
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제17조제1항",
+            "제17조제6항",
+            "제17조제13항",
+            "부칙 제19741호 제4조 및 제5조"
+          ],
+          "temporal_basis": [
+            "incident_date",
+            "report_date",
+            "disposition_date"
+          ],
+          "summary": "학폭 전학 제8호·퇴학 제9호, 의무교육 퇴학 제한, 보호자 특별교육 등을 학생별 사실·근거와 대조한다.",
+          "transition_notes": "제19741호 부칙 제4조는 2024-03-01 이후 신고 사안, 제5조의 분리요청은 이후 발생 사안 기준이다. 이 카탈로그는 2026-06-02 현행본문만 확인했으며 이전 신고·발생일의 실제 적용법은 별도 연혁 검토가 필요하다."
+        },
+        {
+          "id": "sv-disability-expert",
+          "law_name": "학교폭력예방 및 대책에 관한 법률",
+          "kind": "법률",
+          "official_url": "https://www.law.go.kr/LSW/lsInfoR.do?ancYnChk=0&chrClsCd=010202&efYd=20260602&lsiSeq=286361",
+          "mst": "286361",
+          "promulgated_on": "2026-06-02",
+          "effective_from": "2026-06-02",
+          "effective_to_exclusive": "2027-01-01",
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제16조의2제2항",
+            "부칙 제21723호 제2조"
+          ],
+          "temporal_basis": [
+            "deliberation_date"
+          ],
+          "summary": "장애학생 또는 보호자 요청이 있는 경우 특수교육·장애인 전문가 의견청취 의무 여부를 확인한다.",
+          "transition_notes": "2026-06-02 이후 개최 심의위원회부터 개정 단서 적용. 사건 발생일을 기준으로 배제하지 않으며 고시의 재량 표현으로 법률상 요청 시 의무를 약화하지 않는다."
+        },
+        {
+          "id": "sv-disclosure",
+          "law_name": "학교폭력예방 및 대책에 관한 법률",
+          "kind": "법률",
+          "official_url": "https://www.law.go.kr/LSW/lsInfoR.do?ancYnChk=0&chrClsCd=010202&efYd=20260602&lsiSeq=286361",
+          "mst": "286361",
+          "promulgated_on": "2026-06-02",
+          "effective_from": "2026-06-02",
+          "effective_to_exclusive": "2027-01-01",
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제21조"
+          ],
+          "temporal_basis": [
+            "deliberation_date"
+          ],
+          "summary": "비밀유지·회의 비공개와 피해학생·가해학생 또는 보호자의 회의록 공개 신청 예외를 구분한다.",
+          "transition_notes": "일반 제3자 정보공개청구에 당사자 신청 규정을 자동 적용하지 않는다. 실제 공개는 청구인 지위·청구일과 별도 법령·기관 판단이 필요하다."
+        },
+        {
+          "id": "sv-quorum",
+          "law_name": "학교폭력예방 및 대책에 관한 법률 시행령",
+          "kind": "대통령령",
+          "official_url": "https://www.law.go.kr/LSW/lsInfoR.do?ancYnChk=0&chrClsCd=010202&efYd=20260102&lsiSeq=280967",
+          "mst": "280967",
+          "promulgated_on": "2025-12-30",
+          "effective_from": "2026-01-02",
+          "effective_to_exclusive": null,
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제14조제5항",
+            "제14조의2",
+            "제26조"
+          ],
+          "temporal_basis": [
+            "deliberation_date"
+          ],
+          "summary": "재적·출석·찬성 수, 소위원회 위임·보고 및 제척·기피·회피를 확인한다.",
+          "transition_notes": "대통령령 제35947호 2026-01-02 시행본. 본위원회와 소위원회 및 관할 운영기준의 실제 심의 단위를 구별한다."
+        },
+        {
+          "id": "sv-assessment",
+          "law_name": "학교폭력예방 및 대책에 관한 법률 시행령",
+          "kind": "대통령령",
+          "official_url": "https://www.law.go.kr/LSW/lsInfoR.do?ancYnChk=0&chrClsCd=010202&efYd=20260102&lsiSeq=280967",
+          "mst": "280967",
+          "promulgated_on": "2025-12-30",
+          "effective_from": "2026-01-02",
+          "effective_to_exclusive": null,
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제19조"
+          ],
+          "temporal_basis": [
+            "incident_date",
+            "deliberation_date"
+          ],
+          "summary": "심각성·지속성·고의성, 반성, 선도 가능성, 양측 보호자를 포함한 화해 정도 및 피해학생 장애 여부를 검토한다.",
+          "transition_notes": "교권의 학생-교원 관계회복 요소와 학폭의 학생·보호자 간 화해 요소를 같은 의미나 점수로 취급하지 않는다."
+        },
+        {
+          "id": "sv-separation",
+          "law_name": "학교폭력예방 및 대책에 관한 법률 시행령",
+          "kind": "대통령령",
+          "official_url": "https://www.law.go.kr/LSW/lsInfoR.do?ancYnChk=0&chrClsCd=010202&efYd=20260102&lsiSeq=280967",
+          "mst": "280967",
+          "promulgated_on": "2025-12-30",
+          "effective_from": "2026-01-02",
+          "effective_to_exclusive": null,
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제17조의2제1항제3호",
+            "부칙 제35504호 제2조"
+          ],
+          "temporal_basis": [
+            "knowledge_date"
+          ],
+          "summary": "분리 예외의 요건과 학교장 인지 시점을 당시 자료로 대조한다.",
+          "transition_notes": "제35504호 부칙은 2025-05-22 이후 학교장이 인지한 사안에 해당 개정 적용. 이 파일의 시행령 본문 확인범위는 2026-01-02부터이므로 그 이전 시점에는 연혁 조문 재확인이 필요하다."
+        },
+        {
+          "id": "sv-confidentiality",
+          "law_name": "학교폭력예방 및 대책에 관한 법률 시행령",
+          "kind": "대통령령",
+          "official_url": "https://www.law.go.kr/LSW/lsInfoR.do?ancYnChk=0&chrClsCd=010202&efYd=20260102&lsiSeq=280967",
+          "mst": "280967",
+          "promulgated_on": "2025-12-30",
+          "effective_from": "2026-01-02",
+          "effective_to_exclusive": null,
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제33조"
+          ],
+          "temporal_basis": [
+            "deliberation_date"
+          ],
+          "summary": "학생·가족 개인정보 외에 심의·의결 관련 개인별 발언 및 명백한 분쟁 유발 우려 사항도 검토한다.",
+          "transition_notes": "개인별 발언이 비밀 범위라는 이유만으로 원 회의록 삭제 또는 모든 문장의 일괄 비공개를 결정하지 않는다."
+        },
+        {
+          "id": "sv-notice",
+          "law_name": "학교폭력 가해학생 조치별 적용 세부기준 고시",
+          "kind": "교육부고시",
+          "official_url": "https://www.law.go.kr/LSW/admRulLsInfoP.do?admRulSeq=2100000188417",
+          "mst": "2100000188417",
+          "promulgated_on": "2020-05-01",
+          "effective_from": "2020-05-01",
+          "effective_to_exclusive": null,
+          "verified_through": "2026-11-16",
+          "articles": [
+            "제2조",
+            "제3조",
+            "별표",
+            "부칙 제2020-218호",
+            "부칙 제2020-227호"
+          ],
+          "temporal_basis": [
+            "deliberation_date"
+          ],
+          "summary": "학생별 판단 요소·조치 기준·장애학생 관련 전문가 검토를 고시와 상위법에 대조한다.",
+          "transition_notes": "고시 제2020-227호 발령일 시행. 제2020-218호 부칙은 이후 심의하는 사안 기준이다. stale_internal_cross_reference: 제2조제4항의 법 제17조제9항 인용은 현행 보호자 특별교육 조항 제17조제13항과 불일치하므로 담당자 대조가 필요하다. 제3조제1항의 재량 문구로 2026년 법 제16조의2의 요청 시 의무를 대체하지 않는다."
+        }
+      ],
+      "rules": [
+        {
+          "id": "sv-student-specific-facts",
+          "pattern": "학교폭력|학폭|맞폭|쌍방|따돌림|사이버폭력",
+          "issue_types": [
+            "사실인정"
+          ],
+          "risk_level": "중간",
+          "action_code": "V",
+          "source_ids": [
+            "sv-definition"
+          ],
+          "factors": [
+            "학생별 행위",
+            "피해와 관여",
+            "복수 사안 분리"
+          ],
+          "evidence_to_check": [
+            "학생·행위·사안별 증거",
+            "상반·유리한 진술"
+          ],
+          "reason": "쌍방·가담이라는 표현만으로 학생들의 행위와 책임을 일괄 확정하지 않는다."
+        },
+        {
+          "id": "sv-opportunity-and-records",
+          "pattern": "의견.{0,3}진술|불참|서면|통지|아동심리|전문가",
+          "issue_types": [
+            "절차",
+            "기록무결성"
+          ],
+          "risk_level": "중간",
+          "action_code": "V",
+          "source_ids": [
+            "sv-records-procedure"
+          ],
+          "factors": [
+            "피해·가해 양측 절차",
+            "회의록 필수 기록"
+          ],
+          "evidence_to_check": [
+            "양측 통지·의견 제출",
+            "요청 주체별 전문가 청취 기록",
+            "토의와 의결 대조"
+          ],
+          "reason": "당사자별 절차와 신청 여부를 확인하며 한쪽 의견만으로 절차 완료를 표시하지 않는다."
+        },
+        {
+          "id": "sv-disability-expert-request",
+          "pattern": "장애|특수교육|전문가.{0,12}요청",
+          "issue_types": [
+            "절차",
+            "개인정보"
+          ],
+          "risk_level": "높음",
+          "action_code": "L",
+          "source_ids": [
+            "sv-disability-expert",
+            "sv-notice"
+          ],
+          "factors": [
+            "장애학생 또는 보호자 요청",
+            "심의 개최일"
+          ],
+          "evidence_to_check": [
+            "요청서·심의일",
+            "특수교육·장애인 전문가 의견"
+          ],
+          "reason": "2026-06-02 이후 개최 심의의 요청 시 청취의무를 검토하고 장애 상태를 추정하지 않는다."
+        },
+        {
+          "id": "sv-transfer-expulsion",
+          "pattern": "전학|퇴학|8호|9호",
+          "issue_types": [
+            "재량판단",
+            "법적 근거"
+          ],
+          "risk_level": "높음",
+          "action_code": "L",
+          "source_ids": [
+            "sv-measures",
+            "sv-notice"
+          ],
+          "factors": [
+            "학폭 전학 제8호",
+            "학폭 퇴학 제9호",
+            "의무교육 제한"
+          ],
+          "evidence_to_check": [
+            "학생별 판단 근거",
+            "학교급·신고일·발생일",
+            "별표와 상위법"
+          ],
+          "reason": "교권의 전학 제6호·퇴학 제7호 기준을 학폭에 복사하지 않는다."
+        },
+        {
+          "id": "sv-assessment-factors",
+          "pattern": "심각성|지속성|고의성|반성|화해|선도 가능성|점수",
+          "issue_types": [
+            "재량판단",
+            "사실인정"
+          ],
+          "risk_level": "중간",
+          "action_code": "V",
+          "source_ids": [
+            "sv-assessment",
+            "sv-notice"
+          ],
+          "factors": [
+            "학폭 학생·보호자 화해 정도",
+            "피해학생 장애 여부",
+            "반성·선도 가능성"
+          ],
+          "evidence_to_check": [
+            "요소별 자료와 반대 증거",
+            "학생별 점수 근거·별표"
+          ],
+          "reason": "교권과 다른 고려 요소를 표시하고 화해·반성 표현만으로 점수나 조치를 자동 산정하지 않는다."
+        },
+        {
+          "id": "sv-quorum-conflict",
+          "pattern": "정족수|표결|재적|소위원회|제척|기피|회피",
+          "issue_types": [
+            "절차",
+            "기록무결성"
+          ],
+          "risk_level": "중간",
+          "action_code": "V",
+          "source_ids": [
+            "sv-quorum"
+          ],
+          "factors": [
+            "심의 단위",
+            "참여 자격과 기피 의결"
+          ],
+          "evidence_to_check": [
+            "위원 명부·소위원회 위임",
+            "출석·찬반 기록",
+            "제척·기피·회피"
+          ],
+          "reason": "전체위원 정수의 자동 대입을 피하고 기피 대상자의 해당 의결 참여 여부 등을 자료로 확인한다."
+        },
+        {
+          "id": "sv-separation-exception",
+          "pattern": "분리|즉시.{0,8}조치|학교장.{0,8}인지",
+          "issue_types": [
+            "절차",
+            "법적 근거"
+          ],
+          "risk_level": "높음",
+          "action_code": "L",
+          "source_ids": [
+            "sv-separation",
+            "sv-measures"
+          ],
+          "factors": [
+            "학교장 인지일",
+            "발생·신고일별 적용례"
+          ],
+          "evidence_to_check": [
+            "인지·신고 자료",
+            "분리 예외 사유·요청 기록"
+          ],
+          "reason": "발생일·신고일·인지일에 따라 서로 다른 적용례를 구분하여 확인한다."
+        },
+        {
+          "id": "sv-disclosure-and-integrity",
+          "pattern": "회의록|비공개|공개|삭제|가림|개인별 발언",
+          "issue_types": [
+            "개인정보",
+            "기록무결성"
+          ],
+          "risk_level": "높음",
+          "action_code": "L",
+          "source_ids": [
+            "sv-records-procedure",
+            "sv-disclosure",
+            "sv-confidentiality"
+          ],
+          "factors": [
+            "기록 보존",
+            "당사자 신청과 제3자 청구 구분"
+          ],
+          "evidence_to_check": [
+            "원문·결정 이력",
+            "청구인 지위·청구일",
+            "담당자 공개 판단"
+          ],
+          "reason": "결재본의 기록 보존과 공개용 가림을 분리하고 실무자가 문장별 필요성·근거를 판단한다."
+        }
+      ],
+      "required_checks": [
+        {
+          "id": "sv-check-case-separation",
+          "source_ids": [
+            "sv-definition"
+          ],
+          "evidence_to_check": [
+            "학생별 행위·피해·증거 대응표",
+            "반대·유리한 자료"
+          ],
+          "reason": "복수학생·복수사안의 사실과 판단을 섞지 않는다."
+        },
+        {
+          "id": "sv-check-procedure",
+          "source_ids": [
+            "sv-records-procedure",
+            "sv-quorum"
+          ],
+          "evidence_to_check": [
+            "양측 통지·의견서",
+            "전문가 요청·청취",
+            "위원 명부·위임·표결",
+            "관할 운영규정"
+          ],
+          "reason": "자료가 없으면 절차 완료로 표시하지 않는다."
+        },
+        {
+          "id": "sv-check-measures",
+          "source_ids": [
+            "sv-measures",
+            "sv-assessment",
+            "sv-notice"
+          ],
+          "evidence_to_check": [
+            "학생별 판단 근거",
+            "발생·신고·처분일",
+            "법률·고시 별표 대조"
+          ],
+          "reason": "학폭 전용 근거를 적용하고 교권 점수/번호를 재사용하지 않는다."
+        },
+        {
+          "id": "sv-check-disability-transition",
+          "source_ids": [
+            "sv-disability-expert"
+          ],
+          "evidence_to_check": [
+            "심의 개최일",
+            "장애학생 또는 보호자의 요청 여부"
+          ],
+          "reason": "신법 적용례와 요청 시 청취의무를 반드시 분리 확인한다."
+        },
+        {
+          "id": "sv-check-separation-transition",
+          "source_ids": [
+            "sv-separation"
+          ],
+          "evidence_to_check": [
+            "학교장 인지일",
+            "분리 예외 해당 여부"
+          ],
+          "reason": "비해당 여부도 담당자가 자료에 근거하여 기록한다."
+        },
+        {
+          "id": "sv-check-stale-cross-reference",
+          "source_ids": [
+            "sv-notice",
+            "sv-measures",
+            "sv-disability-expert"
+          ],
+          "evidence_to_check": [
+            "고시 제2조제4항과 현행 법 제17조제13항",
+            "고시 제3조제1항과 법 제16조의2제2항"
+          ],
+          "reason": "고시 내부의 과거 항 번호·재량 문구를 상위법 현행 요건으로 오인하지 않는다."
+        },
+        {
+          "id": "sv-check-disclosure",
+          "source_ids": [
+            "sv-disclosure",
+            "sv-confidentiality"
+          ],
+          "evidence_to_check": [
+            "청구인 지위·청구일",
+            "개인별 발언 비밀 범위",
+            "결재본과 공개본의 승인 이력"
+          ],
+          "reason": "기술적 비실명 처리 성공은 공개 적법성 판단이 아니다."
+        }
+      ]
+    }
+  ]
+}
